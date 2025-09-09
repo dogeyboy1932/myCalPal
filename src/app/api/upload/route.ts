@@ -1,4 +1,4 @@
-// API route for image upload with validation and temporary storage
+// Simplified image upload API
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
@@ -7,13 +7,12 @@ import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import sharp from 'sharp';
-import { UploadedFile, ImageProcessingResult } from '../../../types';
+import { UploadedFile } from '../../../types';
 
-const UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'temp');
+const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 
-// Ensure upload directory exists
 async function ensureUploadDir() {
   if (!existsSync(UPLOAD_DIR)) {
     await mkdir(UPLOAD_DIR, { recursive: true });
@@ -24,20 +23,19 @@ export async function POST(request: NextRequest) {
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    if (!session?.user?.email) {
       return NextResponse.json(
-        { success: false, error: 'Unauthorized', message: 'Authentication required' },
+        { success: false, error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    // Parse form data
     const formData = await request.formData();
-    const file = formData.get('image') as File;
+    const file = formData.get('file') as File;
 
     if (!file) {
       return NextResponse.json(
-        { success: false, error: 'Missing file', message: 'Image file is required' },
+        { success: false, error: 'No file provided' },
         { status: 400 }
       );
     }
@@ -45,11 +43,7 @@ export async function POST(request: NextRequest) {
     // Validate file type
     if (!ALLOWED_TYPES.includes(file.type)) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Invalid file type',
-          message: `File type ${file.type} is not supported. Allowed types: ${ALLOWED_TYPES.join(', ')}`
-        },
+        { success: false, error: 'Invalid file type' },
         { status: 400 }
       );
     }
@@ -57,174 +51,52 @@ export async function POST(request: NextRequest) {
     // Validate file size
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'File too large',
-          message: `File size ${Math.round(file.size / 1024 / 1024)}MB exceeds the 10MB limit`
-        },
+        { success: false, error: 'File too large' },
         { status: 400 }
       );
     }
 
-    // Ensure upload directory exists
     await ensureUploadDir();
 
-    // Generate unique filename
+    // Generate filename
     const timestamp = Date.now();
     const randomId = Math.random().toString(36).substr(2, 9);
-    const fileExtension = path.extname(file.name) || '.jpg';
-    const filename = `${timestamp}_${randomId}${fileExtension}`;
+    const filename = `${timestamp}_${randomId}.jpg`;
     const filePath = path.join(UPLOAD_DIR, filename);
 
-    // Convert file to buffer
+    // Process and save image
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+    
+    // Optimize image
+    const processedBuffer = await sharp(buffer)
+      .resize(2048, null, { withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toBuffer();
 
-    // Process image with Sharp to get metadata and optimize
-    const startProcessing = Date.now();
-    let processedBuffer = buffer;
-    let metadata;
-
-    try {
-      const sharpImage = sharp(buffer);
-      metadata = await sharpImage.metadata();
-      
-      // Optimize image if it's too large
-      if (metadata.width && metadata.width > 2048) {
-        const optimizedBuffer = await sharpImage
-          .resize(2048, null, { withoutEnlargement: true })
-          .jpeg({ quality: 85 })
-          .toBuffer();
-        processedBuffer = Buffer.from(optimizedBuffer);
-      }
-    } catch (error) {
-      console.error('Image processing error:', error);
-      // Use original buffer if processing fails
-      metadata = {
-        width: 0,
-        height: 0,
-        format: file.type.split('/')[1] || 'unknown',
-        hasAlpha: false
-      };
-    }
-
-    // Save file to disk
     await writeFile(filePath, processedBuffer);
 
-    // Create uploaded file record
     const uploadedFile: UploadedFile = {
-      id: `upload_${timestamp}_${randomId}`,
+      id: `${timestamp}_${randomId}`,
       filename,
       originalName: file.name,
-      mimeType: file.type,
+      mimeType: 'image/jpeg',
       size: processedBuffer.length,
       path: filePath,
-      url: `/api/files/${filename}`,
       uploadedAt: new Date(),
-      uploadedBy: session.user.id
-    };
-
-    // Create processing result
-    const processingResult: ImageProcessingResult = {
-      id: uploadedFile.id,
-      originalImage: uploadedFile,
-      metadata: {
-        width: metadata?.width || 0,
-        height: metadata?.height || 0,
-        format: metadata?.format || 'unknown',
-        hasAlpha: metadata?.hasAlpha || false,
-        density: metadata?.density,
-        colorSpace: metadata?.space
-      },
-      processingTime: Date.now() - startProcessing,
-      processingStatus: 'completed'
+      uploadedBy: session.user.email
     };
 
     return NextResponse.json({
       success: true,
-      data: {
-        file: uploadedFile,
-        processing: processingResult
-      },
-      message: 'File uploaded successfully',
-      timestamp: new Date().toISOString()
+      data: uploadedFile
     });
 
   } catch (error) {
-    console.error('Upload API error:', error);
-    
+    console.error('Upload error:', error);
     return NextResponse.json(
-      {
-        success: false,
-        error: 'Upload failed',
-        message: error instanceof Error ? error.message : 'An unexpected error occurred',
-        timestamp: new Date().toISOString()
-      },
+      { success: false, error: 'Upload failed' },
       { status: 500 }
     );
   }
-}
-
-// Handle file serving
-export async function GET(request: NextRequest) {
-  try {
-    const url = new URL(request.url);
-    const filename = url.pathname.split('/').pop();
-    
-    if (!filename) {
-      return NextResponse.json(
-        { success: false, error: 'Missing filename' },
-        { status: 400 }
-      );
-    }
-
-    const filePath = path.join(UPLOAD_DIR, filename);
-    
-    if (!existsSync(filePath)) {
-      return NextResponse.json(
-        { success: false, error: 'File not found' },
-        { status: 404 }
-      );
-    }
-
-    // Read and serve file
-    const { readFile } = await import('fs/promises');
-    const fileBuffer = await readFile(filePath);
-    
-    // Determine content type from filename
-    const ext = path.extname(filename).toLowerCase();
-    const contentType = {
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png',
-      '.webp': 'image/webp',
-      '.gif': 'image/gif'
-    }[ext] || 'application/octet-stream';
-
-    return new NextResponse(fileBuffer as any, {
-      headers: {
-        'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=3600'
-      }
-    });
-
-  } catch (error) {
-    console.error('File serving error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to serve file' },
-      { status: 500 }
-    );
-  }
-}
-
-// Handle OPTIONS for CORS
-export async function OPTIONS(request: NextRequest) {
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    },
-  });
 }

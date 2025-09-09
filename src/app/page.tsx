@@ -4,9 +4,9 @@ import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { useState, useEffect } from 'react';
-import ImageUpload from '@/components/ImageUpload';
-import EventDraft from '@/components/EventDraft';
-import { ExtractedEvent } from '@/types/event';
+import ImageUpload from '../components/ImageUpload';
+import EventDraft from '../components/EventDraft';
+import { ExtractedEvent } from '../types';
 
 // Make this component dynamic to avoid SSR issues
 const DynamicHome = dynamic(() => Promise.resolve(HomeComponent), {
@@ -81,30 +81,23 @@ function HomeComponent() {
         // document.body.appendChild(debugInfo);
         
         const newEvent: ExtractedEvent = {
-          id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          title: result.data.extractedData.title,
-          date: result.data.extractedData.date,
-          time: result.data.extractedData.time,
-          startTime: result.data.extractedData.startTime,
-          endTime: result.data.extractedData.endTime,
-          location: result.data.extractedData.location,
-          description: result.data.extractedData.description,
-          attendees: result.data.extractedData.attendees || [],
-          category: result.data.extractedData.category,
-          dayOfWeek: result.data.extractedData.dayOfWeek,
-          duration: result.data.extractedData.duration,
-          timezone: result.data.extractedData.timezone,
-          priority: result.data.extractedData.priority,
-          organizer: result.data.extractedData.organizer,
-          contact: result.data.extractedData.contact,
-          website: result.data.extractedData.website,
-          recurrence: result.data.extractedData.recurrence,
-          originalImage: result.data.extractedData.originalImage,
-          confidence: result.data.confidence || 0,
-          status: 'draft' as const,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
+            id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            title: result.data.extractedData.title,
+            date: result.data.extractedData.date,
+            time: result.data.extractedData.time,
+            startTime: result.data.extractedData.startTime,
+            endTime: result.data.extractedData.endTime,
+            location: result.data.extractedData.location,
+            description: result.data.extractedData.description,
+            attendees: result.data.extractedData.attendees || [],
+            category: result.data.extractedData.category,
+            confidence: result.data.confidence || 0,
+            status: 'draft' as const,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+        
+        console.log(newEvent)
         
         setEventDrafts(prev => [newEvent, ...prev]);
         setActiveTab('drafts'); // Switch to drafts tab to show the result
@@ -133,8 +126,35 @@ function HomeComponent() {
     setEventDrafts(prev => prev.filter(event => event.id !== eventId));
   };
 
+  // Test function to create a sample event for debugging
+  const handleTestCalendarCreate = async () => {
+    const testEvent: ExtractedEvent = {
+      id: `test_${Date.now()}`,
+      title: 'Test Meeting',
+      date: '2024-01-15',
+      time: '14:00',
+      location: 'Conference Room A',
+      description: 'Test event for debugging calendar creation',
+      attendees: [],
+      confidence: 1.0,
+      status: 'draft',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    console.log('Testing calendar creation with:', testEvent);
+    await handlePublishEvent(testEvent);
+  };
+
   const handlePublishEvent = async (event: ExtractedEvent) => {
     try {
+      // Convert date and time to proper startTime and endTime (preserve original date)
+      // Parse date and time components to avoid timezone conversion
+      const [year, month, day] = event.date.split('-').map(Number);
+      const [hours, minutes] = event.time.split(':').map(Number);
+      const startDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
+      const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000); // Add 1 hour
+      
       const response = await fetch('/api/calendar/create', {
         method: 'POST',
         headers: {
@@ -142,10 +162,11 @@ function HomeComponent() {
         },
         body: JSON.stringify({
           title: event.title,
-          date: event.date,
-          time: event.time,
+          startTime: startDateTime.toISOString(),
+          endTime: endDateTime.toISOString(),
           location: event.location,
           description: event.description,
+          providerId: 'google'
         }),
       });
 
@@ -329,9 +350,9 @@ function HomeComponent() {
               </div>
             )}
             
-            <ImageUpload 
+            <ImageUpload
               onUpload={handleImageUpload}
-              isUploading={isUploading}
+              isProcessing={isUploading}
             />
           </div>
         )}
@@ -341,9 +362,17 @@ function HomeComponent() {
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium text-gray-900">Event Drafts</h2>
-                <span className="text-sm text-gray-500">
-                  {eventDrafts.length} {eventDrafts.length === 1 ? 'draft' : 'drafts'}
-                </span>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={handleTestCalendarCreate}
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm"
+                  >
+                    🧪 Test Calendar Create
+                  </button>
+                  <span className="text-sm text-gray-500">
+                    {eventDrafts.length} {eventDrafts.length === 1 ? 'draft' : 'drafts'}
+                  </span>
+                </div>
               </div>
               
               {eventDrafts.length === 0 ? (
@@ -354,15 +383,18 @@ function HomeComponent() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {eventDrafts.map((event) => (
-                    <EventDraft
-                      key={event.id}
-                      event={event}
-                      onSave={handleSaveEvent}
-                      onDelete={handleDeleteEvent}
-                      onPublish={handlePublishEvent}
-                    />
-                  ))}
+                  {eventDrafts.map((event) => {
+                    console.log(event)
+                    return (
+                      <EventDraft
+                        key={event.id}
+                        event={event}
+                        onSave={handleSaveEvent}
+                        onDelete={handleDeleteEvent}
+                        onPublish={handlePublishEvent}
+                      />
+                    )
+                  })}
                 </div>
               )}
             </div>

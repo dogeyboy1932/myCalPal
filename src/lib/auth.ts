@@ -2,17 +2,16 @@
 
 import { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
-import { CalendarProvider } from '../types/providers';
+import { CalendarProvider } from '../types';
 
-// Temporarily removed MongoDB dependencies to test Google OAuth
-// import { MongoDBAdapter } from '@next-auth/mongodb-adapter';
-// import { MongoClient } from 'mongodb';
-// import { connectToDatabase } from './mongodb';
-// import User from '../models/User';
+import { MongoDBAdapter } from '@next-auth/mongodb-adapter';
+import { MongoClient } from 'mongodb';
+import { connectToDatabase } from './mongodb';
+import { User } from '../models';
 
-// MongoDB client for NextAuth adapter (disabled)
-// const client = new MongoClient(process.env.MONGODB_URI!);
-// const clientPromise = client.connect();
+// MongoDB client for NextAuth adapter
+const client = new MongoClient(process.env.MONGODB_URI!);
+const clientPromise = client.connect();
 
 // Microsoft provider configuration (manual implementation since next-auth doesn't have built-in Microsoft Graph support)
 const MicrosoftProvider = {
@@ -42,8 +41,7 @@ const MicrosoftProvider = {
 };
 
 export const authOptions: NextAuthOptions = {
-  // Temporarily disabled MongoDB adapter to test Google OAuth
-  // adapter: MongoDBAdapter(clientPromise),
+  adapter: MongoDBAdapter(clientPromise),
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -60,11 +58,7 @@ export const authOptions: NextAuthOptions = {
   ],
   
   session: {
-    strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 days
-  },
-  
-  jwt: {
+    strategy: 'database',
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   
@@ -78,7 +72,7 @@ export const authOptions: NextAuthOptions = {
   
   callbacks: {
     async signIn({ user, account, profile }) {
-      // Simplified sign-in without database for testing
+      // Allow any user with a valid Google account to sign in
       if (!account || !user.email) {
         return false;
       }
@@ -89,69 +83,55 @@ export const authOptions: NextAuthOptions = {
         name: user.name
       });
       
+      // With MongoDB adapter, user creation is handled automatically
+      // We just need to allow the sign-in
       return true;
-      
-      // Database operations disabled for testing
-      /*
-      try {
-        await connectToDatabase();
+    },
+    
+    async session({ session, user, token }) {
+      // With database sessions, user info comes from the database
+      if (user && session.user) {
+        session.user.id = user.id;
         
-        // Find or create user
-        let dbUser = await User.findOne({ email: user.email });
-        
-        if (!dbUser) {
-          // Create new user
-          dbUser = new User({
-            email: user.email,
-            name: user.name || '',
-            image: user.image,
-            providers: [],
-            preferences: {
-              defaultCalendarProvider: account.provider as CalendarProvider,
-            },
+        // Get the user's Google account tokens from the database
+        try {
+          console.log('🔍 Fetching tokens for user:', user.id);
+          await connectToDatabase();
+          const client = await clientPromise;
+          const accounts = client.db().collection('accounts');
+          
+          // Try both string and ObjectId formats for userId
+          const googleAccount = await accounts.findOne({
+            $or: [
+              { userId: user.id },
+              { userId: new (require('mongodb')).ObjectId(user.id) }
+            ],
+            provider: 'google'
           });
-        }
-      */
-    },
-    
-    async jwt({ token, account, user, trigger, session }) {
-      // Simplified JWT without database for testing
-      if (account && user) {
-        token.userId = user.id;
-        token.email = user.email;
-        token.name = user.name;
-        token.picture = user.image;
-        token.provider = account.provider;
-        
-        // Store access token for API calls
-        if (account.access_token) {
-          token.accessToken = account.access_token;
-        }
-        if (account.refresh_token) {
-          token.refreshToken = account.refresh_token;
-        }
-        if (account.expires_at) {
-          token.accessTokenExpires = account.expires_at;
+          
+          console.log('🔍 Google account found:', !!googleAccount);
+          if (googleAccount) {
+            console.log('🔍 Account data:', {
+              hasAccessToken: !!googleAccount.access_token,
+              hasRefreshToken: !!googleAccount.refresh_token,
+              expiresAt: googleAccount.expires_at
+            });
+            (session as any).accessToken = googleAccount.access_token;
+            (session as any).refreshToken = googleAccount.refresh_token;
+            (session as any).tokenExpiry = googleAccount.expires_at;
+          } else {
+            console.log('❌ No Google account found for user:', user.id);
+          }
+        } catch (error) {
+          console.error('Error fetching user tokens:', error);
         }
       }
       
-      return token;
-    },
-    
-    async session({ session, token }) {
-      // Simplified session without database for testing
-      if (token) {
-        session.user.id = token.userId as string;
-        session.user.email = token.email as string;
-        session.user.name = token.name as string;
-        session.user.image = token.picture as string;
-        
-        // Add access token to session for API calls
-        (session as any).accessToken = token.accessToken as string;
-        (session as any).refreshToken = token.refreshToken as string;
-        (session as any).provider = token.provider as string;
-      }
-      
+      console.log('🔍 Final session:', {
+        hasUser: !!session.user,
+        hasAccessToken: !!(session as any).accessToken,
+        hasRefreshToken: !!(session as any).refreshToken
+      });
       return session;
     },
     

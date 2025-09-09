@@ -1,127 +1,144 @@
-// Database models exports
+// Simplified consolidated database models
 
-export { default as User } from './User';
-export { default as EventDraft } from './EventDraft';
-export { default as CalendarMapping } from './CalendarMapping';
+import mongoose, { Schema, Document, Model } from 'mongoose';
+import { CalendarProvider, ExtractedEvent, UserProfile, DraftStatus } from '../types';
 
-// Re-export types for convenience
-export type { IUser } from './User';
-export type { IEventDraft } from './EventDraft';
-export type { ICalendarMapping } from './CalendarMapping';
+// User Model
+export interface IUser extends Document {
+  email: string;
+  name: string;
+  image?: string;
+  timezone: string;
+  providers: Array<{
+    provider: CalendarProvider;
+    providerId: string;
+    accessToken: string;
+    refreshToken?: string;
+    expiresAt?: Date;
+  }>;
+  preferences: {
+    confidenceThreshold: number;
+    autoPublish: boolean;
+    defaultCalendar?: string;
+  };
+  createdAt: Date;
+  updatedAt: Date;
+}
 
-// Model utilities
-export const Models = {
-  User: () => import('./User').then(m => m.default),
-  EventDraft: () => import('./EventDraft').then(m => m.default),
-  CalendarMapping: () => import('./CalendarMapping').then(m => m.default),
-};
+const UserSchema = new Schema<IUser>({
+  email: { type: String, required: true, unique: true, lowercase: true },
+  name: { type: String, required: true },
+  image: String,
+  timezone: { type: String, default: 'UTC' },
+  providers: [{
+    provider: { type: String, enum: ['google', 'microsoft'], required: true },
+    providerId: { type: String, required: true },
+    accessToken: { type: String, required: true },
+    refreshToken: String,
+    expiresAt: Date
+  }],
+  preferences: {
+    confidenceThreshold: { type: Number, default: 0.8, min: 0, max: 1 },
+    autoPublish: { type: Boolean, default: false },
+    defaultCalendar: String
+  }
+}, { timestamps: true });
 
-// Database initialization helper
+UserSchema.index({ email: 1 });
+UserSchema.index({ 'providers.provider': 1, 'providers.providerId': 1 });
+
+// EventDraft Model
+export interface IEventDraft extends Document {
+  userId: mongoose.Types.ObjectId;
+  status: DraftStatus;
+  title: string;
+  description?: string;
+  startTime?: Date;
+  endTime?: Date;
+  location?: string;
+  attendees: string[];
+  targetProvider?: CalendarProvider;
+  targetCalendarId?: string;
+  extractedFromImage?: boolean;
+  imageId?: string;
+  aiConfidence?: number;
+  publishedEventId?: string;
+  publishedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const EventDraftSchema = new Schema<IEventDraft>({
+  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  status: {
+    type: String,
+    enum: ['pending', 'processing', 'ready', 'published', 'failed'],
+    default: 'pending',
+    index: true
+  },
+  title: { type: String, required: true, trim: true },
+  description: { type: String, trim: true },
+  startTime: { type: Date, index: true },
+  endTime: { type: Date, index: true },
+  location: { type: String, trim: true },
+  attendees: [{ type: String, trim: true }],
+  targetProvider: { type: String, enum: ['google', 'microsoft'] },
+  targetCalendarId: String,
+  extractedFromImage: { type: Boolean, default: false },
+  imageId: String,
+  aiConfidence: { type: Number, min: 0, max: 1 },
+  publishedEventId: String,
+  publishedAt: Date
+}, { timestamps: true });
+
+EventDraftSchema.index({ userId: 1, status: 1 });
+EventDraftSchema.index({ userId: 1, createdAt: -1 });
+
+// CalendarMapping Model
+export interface ICalendarMapping extends Document {
+  userId: mongoose.Types.ObjectId;
+  provider: CalendarProvider;
+  calendarId: string;
+  calendarName: string;
+  isPrimary: boolean;
+  syncEnabled: boolean;
+  lastSyncAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const CalendarMappingSchema = new Schema<ICalendarMapping>({
+  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  provider: { type: String, enum: ['google', 'microsoft'], required: true, index: true },
+  calendarId: { type: String, required: true, index: true },
+  calendarName: { type: String, required: true, trim: true },
+  isPrimary: { type: Boolean, default: false, index: true },
+  syncEnabled: { type: Boolean, default: true },
+  lastSyncAt: Date
+}, { timestamps: true });
+
+CalendarMappingSchema.index({ userId: 1, provider: 1 });
+CalendarMappingSchema.index({ provider: 1, calendarId: 1 }, { unique: true });
+
+// Export models
+export const User: Model<IUser> = mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
+export const EventDraft: Model<IEventDraft> = mongoose.models.EventDraft || mongoose.model<IEventDraft>('EventDraft', EventDraftSchema);
+export const CalendarMapping: Model<ICalendarMapping> = mongoose.models.CalendarMapping || mongoose.model<ICalendarMapping>('CalendarMapping', CalendarMappingSchema);
+
+// Simple initialization helper
 export async function initializeModels() {
   try {
-    // Import all models to ensure they're registered with Mongoose
-    await Promise.all([
-      import('./User'),
-      import('./EventDraft'),
-      import('./CalendarMapping'),
-    ]);
-    
-    console.log('✅ All database models initialized');
+    console.log('✅ Database models initialized');
     return true;
   } catch (error) {
-    console.error('❌ Error initializing database models:', error);
+    console.error('❌ Error initializing models:', error);
     throw error;
   }
 }
 
-// Model validation helpers
-export const ModelValidators = {
-  isValidObjectId: (id: string): boolean => {
-    return /^[0-9a-fA-F]{24}$/.test(id);
-  },
-  
-  isValidEmail: (email: string): boolean => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  },
-  
-  isValidTimezone: (timezone: string): boolean => {
-    try {
-      Intl.DateTimeFormat(undefined, { timeZone: timezone });
-      return true;
-    } catch {
-      return false;
-    }
-  },
-  
-  isValidHexColor: (color: string): boolean => {
-    return /^#[0-9A-F]{6}$/i.test(color);
-  }
+// Simple validation helper
+export const isValidObjectId = (id: string): boolean => {
+  return /^[0-9a-fA-F]{24}$/.test(id);
 };
 
-// Common query helpers
-export const QueryHelpers = {
-  // Pagination helper
-  paginate: (page: number = 1, limit: number = 10) => {
-    const skip = (page - 1) * limit;
-    return { skip, limit };
-  },
-  
-  // Date range helper
-  dateRange: (start?: Date, end?: Date) => {
-    const query: any = {};
-    if (start || end) {
-      query.createdAt = {};
-      if (start) query.createdAt.$gte = start;
-      if (end) query.createdAt.$lte = end;
-    }
-    return query;
-  },
-  
-  // Search helper
-  textSearch: (fields: string[], query: string) => {
-    if (!query) return {};
-    
-    const searchRegex = new RegExp(query, 'i');
-    return {
-      $or: fields.map(field => ({ [field]: searchRegex }))
-    };
-  }
-};
-
-// Database health check
-export async function checkModelsHealth() {
-  const results = {
-    User: { status: 'unknown', count: 0, error: null as string | null },
-    EventDraft: { status: 'unknown', count: 0, error: null as string | null },
-    CalendarMapping: { status: 'unknown', count: 0, error: null as string | null },
-  };
-  
-  try {
-    const User = (await import('./User')).default;
-    results.User.count = await User.countDocuments();
-    results.User.status = 'healthy';
-  } catch (error) {
-    results.User.status = 'error';
-    results.User.error = error instanceof Error ? error.message : 'Unknown error';
-  }
-  
-  try {
-    const EventDraft = (await import('./EventDraft')).default;
-    results.EventDraft.count = await EventDraft.countDocuments();
-    results.EventDraft.status = 'healthy';
-  } catch (error) {
-    results.EventDraft.status = 'error';
-    results.EventDraft.error = error instanceof Error ? error.message : 'Unknown error';
-  }
-  
-  try {
-    const CalendarMapping = (await import('./CalendarMapping')).default;
-    results.CalendarMapping.count = await CalendarMapping.countDocuments();
-    results.CalendarMapping.status = 'healthy';
-  } catch (error) {
-    results.CalendarMapping.status = 'error';
-    results.CalendarMapping.error = error instanceof Error ? error.message : 'Unknown error';
-  }
-  
-  return results;
-}
+export default { User, EventDraft, CalendarMapping, initializeModels, isValidObjectId };
