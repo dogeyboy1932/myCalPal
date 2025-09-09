@@ -27,8 +27,9 @@ function HomeComponent() {
   const [isUploading, setIsUploading] = useState(false);
   const [eventDrafts, setEventDrafts] = useState<ExtractedEvent[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [skipDrafts, setSkipDrafts] = useState(false);
 
-  // Load drafts from localStorage on component mount
+  // Load drafts and settings from localStorage on component mount
   useEffect(() => {
     const savedDrafts = localStorage.getItem('eventDrafts');
     if (savedDrafts) {
@@ -38,12 +39,26 @@ function HomeComponent() {
         console.error('Failed to load saved drafts:', error);
       }
     }
+    
+    const savedSkipDrafts = localStorage.getItem('skipDrafts');
+    if (savedSkipDrafts) {
+      try {
+        setSkipDrafts(JSON.parse(savedSkipDrafts));
+      } catch (error) {
+        console.error('Failed to load skip drafts setting:', error);
+      }
+    }
   }, []);
 
   // Save drafts to localStorage whenever drafts change
   useEffect(() => {
     localStorage.setItem('eventDrafts', JSON.stringify(eventDrafts));
   }, [eventDrafts]);
+
+  // Save skipDrafts setting to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('skipDrafts', JSON.stringify(skipDrafts));
+  }, [skipDrafts]);
 
   const handleImageUpload = async (file: File) => {
     setIsUploading(true);
@@ -99,8 +114,14 @@ function HomeComponent() {
         
         console.log(newEvent)
         
-        setEventDrafts(prev => [newEvent, ...prev]);
-        setActiveTab('drafts'); // Switch to drafts tab to show the result
+        if (skipDrafts) {
+          // Skip drafts and publish directly
+          await handlePublishEvent(newEvent);
+        } else {
+          // Create draft as usual
+          setEventDrafts(prev => [newEvent, ...prev]);
+          setActiveTab('drafts'); // Switch to drafts tab to show the result
+        }
       } else {
         throw new Error(result.error || 'Failed to extract event information');
       }
@@ -356,6 +377,28 @@ function HomeComponent() {
         {activeTab === 'upload' && (
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">Upload Event Image</h2>
+            
+            {/* Skip Drafts Toggle */}
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-blue-600">⚡</span>
+                  <div>
+                    <h3 className="font-medium text-blue-900">Quick Publish Mode</h3>
+                    <p className="text-sm text-blue-700">Skip drafts and publish events directly to your calendar</p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={skipDrafts}
+                    onChange={(e) => setSkipDrafts(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+            </div>
             
             {uploadError && (
               <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
