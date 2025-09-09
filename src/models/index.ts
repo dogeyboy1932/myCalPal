@@ -109,7 +109,7 @@ export interface ICalendarMapping extends Document {
 
 const CalendarMappingSchema = new Schema<ICalendarMapping>({
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  provider: { type: String, enum: ['google', 'microsoft'], required: true, index: true },
+  provider: { type: String, enum: ['google'], required: true, index: true },
   calendarId: { type: String, required: true, index: true },
   calendarName: { type: String, required: true, trim: true },
   isPrimary: { type: Boolean, default: false, index: true },

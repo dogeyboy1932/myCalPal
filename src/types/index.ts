@@ -62,7 +62,7 @@ export interface AIExtractionResult {
 }
 
 // Calendar provider types
-export type CalendarProvider = 'google' | 'microsoft';
+export type CalendarProvider = 'google';
 
 export interface CalendarEvent {
   id?: string;

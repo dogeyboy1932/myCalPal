@@ -1,10 +1,10 @@
 // NextAuth.js configuration with multi-provider support
 
 import { NextAuthOptions } from 'next-auth';
-import GoogleProvider from 'next-auth/providers/google';
 import { CalendarProvider } from '../types';
 
 import { MongoDBAdapter } from '@next-auth/mongodb-adapter';
+import GoogleProvider from 'next-auth/providers/google';
 import { MongoClient } from 'mongodb';
 import { connectToDatabase } from './mongodb';
 import { User } from '../models';
@@ -13,32 +13,7 @@ import { User } from '../models';
 const client = new MongoClient(process.env.MONGODB_URI!);
 const clientPromise = client.connect();
 
-// Microsoft provider configuration (manual implementation since next-auth doesn't have built-in Microsoft Graph support)
-const MicrosoftProvider = {
-  id: 'microsoft',
-  name: 'Microsoft',
-  type: 'oauth' as const,
-  authorization: {
-    url: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
-    params: {
-      scope: process.env.MICROSOFT_GRAPH_SCOPE || 'openid profile email https://graph.microsoft.com/calendars.readwrite https://graph.microsoft.com/user.read',
-      response_type: 'code',
-      response_mode: 'query',
-    },
-  },
-  token: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
-  userinfo: 'https://graph.microsoft.com/v1.0/me',
-  clientId: process.env.MICROSOFT_CLIENT_ID!,
-  clientSecret: process.env.MICROSOFT_CLIENT_SECRET!,
-  profile(profile: any) {
-    return {
-      id: profile.id,
-      name: profile.displayName,
-      email: profile.mail || profile.userPrincipalName,
-      image: null, // Microsoft Graph doesn't provide profile pictures in basic profile
-    };
-  },
-};
+
 
 export const authOptions: NextAuthOptions = {
   adapter: MongoDBAdapter(clientPromise),
@@ -54,7 +29,6 @@ export const authOptions: NextAuthOptions = {
         },
       },
     }),
-    MicrosoftProvider as any,
   ],
   
   session: {

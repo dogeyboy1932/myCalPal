@@ -2,7 +2,6 @@
 
 import { BaseCalendarProvider, CalendarTokens } from './base';
 import { GoogleCalendarProvider } from './google';
-import { MicrosoftCalendarProvider } from './microsoft';
 import { CalendarProvider } from '../../../types';
 
 export class CalendarProviderFactory {
@@ -10,15 +9,13 @@ export class CalendarProviderFactory {
     switch (provider) {
       case 'google':
         return new GoogleCalendarProvider(tokens);
-      case 'microsoft':
-        return new MicrosoftCalendarProvider(tokens);
       default:
         throw new Error(`Unsupported calendar provider: ${provider}`);
     }
   }
 
   static getSupportedProviders(): CalendarProvider[] {
-    return ['google', 'microsoft'];
+    return ['google'];
   }
 
   static isProviderSupported(provider: string): provider is CalendarProvider {
