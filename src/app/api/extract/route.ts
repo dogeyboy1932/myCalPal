@@ -5,16 +5,25 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../lib/auth';
 import { geminiService } from '../../../lib/services/gemini';
 import { AIExtractionRequest, AIExtractionResult } from '../../../types';
+import { broadcastToClients } from '../websocket/route';
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
+    // Check authentication (allow internal receiver via token bypass)
     const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const internalToken = request.headers.get('x-receiver-token');
+    const expectedToken = process.env.RECEIVER_TOKEN || process.env.IMAGE_RECEIVER_TOKEN;
+    let userEmail: string | null = session?.user?.email || null;
+
+    if (!userEmail) {
+      if (internalToken && expectedToken && internalToken === expectedToken) {
+        userEmail = 'receiver@internal';
+      } else {
+        return NextResponse.json(
+          { success: false, error: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
     }
 
     const formData = await request.formData();
@@ -52,7 +61,7 @@ export async function POST(request: NextRequest) {
     const result: AIExtractionResult = {
       id: `extraction_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       imageId: `image_${Date.now()}`,
-      userId: session.user.email,
+      userId: userEmail!,
       status: 'completed',
       extractedData,
       confidence: extractedData.confidence,
@@ -62,6 +71,33 @@ export async function POST(request: NextRequest) {
       createdAt: new Date(),
       completedAt: new Date()
     };
+
+    // Emit WebSocket event for real-time updates
+    try {
+      const eventData = {
+        type: 'event_extracted',
+        event: {
+          title: extractedData.title,
+          date: extractedData.date,
+          time: extractedData.time,
+          startTime: extractedData.startTime,
+          endTime: extractedData.endTime,
+          location: extractedData.location,
+          description: extractedData.description,
+          attendees: extractedData.attendees || [],
+          category: extractedData.category,
+          confidence: extractedData.confidence || 0
+        },
+        timestamp: new Date().toISOString(),
+        userId: userEmail
+      };
+      
+      broadcastToClients(eventData);
+      console.log('📡 WebSocket event broadcasted:', eventData.event.title);
+    } catch (wsError) {
+      console.error('WebSocket broadcast failed:', wsError);
+      // Don't fail the request if WebSocket fails
+    }
 
     return NextResponse.json({
       success: true,

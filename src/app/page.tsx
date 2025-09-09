@@ -28,6 +28,7 @@ function HomeComponent() {
   const [eventDrafts, setEventDrafts] = useState<ExtractedEvent[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [skipDrafts, setSkipDrafts] = useState(false);
+  const [wsConnected, setWsConnected] = useState(false);
 
   // Load drafts and settings from localStorage on component mount
   useEffect(() => {
@@ -59,6 +60,72 @@ function HomeComponent() {
   useEffect(() => {
     localStorage.setItem('skipDrafts', JSON.stringify(skipDrafts));
   }, [skipDrafts]);
+
+  // Server-Sent Events connection for real-time updates
+  useEffect(() => {
+    let eventSource: EventSource | null = null;
+    
+    const connectSSE = () => {
+      try {
+        eventSource = new EventSource('/api/websocket');
+        
+        eventSource.onopen = () => {
+          console.log('🔌 SSE connected');
+          setWsConnected(true);
+        };
+        
+        eventSource.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('📨 SSE message received:', data);
+            
+            if (data.type === 'event_extracted' && data.event) {
+              // Add the extracted event to drafts
+              const newEvent: ExtractedEvent = {
+                ...data.event,
+                id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                status: 'draft' as const,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              };
+              
+              setEventDrafts(prev => [...prev, newEvent]);
+              setActiveTab('drafts'); // Switch to drafts tab to show the new event
+              
+              // Show notification
+              console.log('✅ New event received via SSE:', newEvent.title);
+            }
+            
+            if (data.type === 'draft_created') {
+              console.log('📝 Draft created notification:', data.message);
+            }
+          } catch (error) {
+            console.error('Failed to parse SSE message:', error);
+          }
+        };
+        
+        eventSource.onerror = (error) => {
+          console.error('SSE error:', error);
+          setWsConnected(false);
+          eventSource?.close();
+          
+          // Attempt to reconnect after 3 seconds
+          setTimeout(connectSSE, 3000);
+        };
+      } catch (error) {
+        console.error('Failed to connect SSE:', error);
+        setTimeout(connectSSE, 3000);
+      }
+    };
+    
+    connectSSE();
+    
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
+  }, []);
 
   const handleImageUpload = async (file: File) => {
     setIsUploading(true);
@@ -318,6 +385,14 @@ function HomeComponent() {
             </div>
             
             <div className="flex items-center gap-4">
+              {/* WebSocket Status Indicator */}
+              <div className="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium">
+                <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                <span className={wsConnected ? 'text-green-700' : 'text-red-700'}>
+                  {wsConnected ? 'Live Updates' : 'Disconnected'}
+                </span>
+              </div>
+              
               <div className="flex items-center gap-2">
                 {session.user?.image && (
                   <img
