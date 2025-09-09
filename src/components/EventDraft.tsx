@@ -2,18 +2,20 @@
 
 import { useState } from 'react';
 import { ExtractedEvent } from '../types';
+import CalendarSelector from './CalendarSelector';
 
 interface EventDraftProps {
   event: ExtractedEvent;
   onSave: (event: ExtractedEvent) => void;
   onDelete: (id: string) => void;
-  onPublish: (event: ExtractedEvent) => void;
+  onPublish: (event: ExtractedEvent, calendarId?: string) => void;
 }
 
 export default function EventDraft({ event, onSave, onDelete, onPublish }: EventDraftProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedEvent, setEditedEvent] = useState<ExtractedEvent>(event);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [selectedCalendarId, setSelectedCalendarId] = useState<string>('');
 
   const handleSave = () => {
     onSave(editedEvent);
@@ -23,7 +25,7 @@ export default function EventDraft({ event, onSave, onDelete, onPublish }: Event
   const handlePublish = async () => {
     setIsPublishing(true);
     try {
-      await onPublish(editedEvent);
+      await onPublish(editedEvent, selectedCalendarId);
     } finally {
       setIsPublishing(false);
     }
@@ -132,13 +134,20 @@ export default function EventDraft({ event, onSave, onDelete, onPublish }: Event
             {event.description && <p><strong>Description:</strong> {event.description}</p>}
           </div>
           
-          <button
-            onClick={handlePublish}
-            disabled={isPublishing}
-            className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
-          >
-            {isPublishing ? 'Publishing...' : 'Publish to Calendar'}
-          </button>
+          <div className="flex items-center gap-3">
+            <CalendarSelector
+              selectedCalendarId={selectedCalendarId}
+              onCalendarSelect={setSelectedCalendarId}
+              disabled={isPublishing}
+            />
+            <button
+              onClick={handlePublish}
+              disabled={isPublishing || !selectedCalendarId}
+              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
+            >
+              {isPublishing ? 'Publishing...' : 'Publish to Calendar'}
+            </button>
+          </div>
         </div>
       )}
     </div>

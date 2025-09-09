@@ -27,8 +27,8 @@ export async function POST(request: NextRequest) {
 
     const body: CalendarEvent = await request.json();
     console.log('Request body:', JSON.stringify(body, null, 2));
-    const { title, description, startTime, endTime, location, attendees, providerId } = body;
-    console.log('Extracted fields:', { title, startTime, endTime, description, location, attendees, providerId });
+    const { title, description, startTime, endTime, location, attendees, providerId, calendarId } = body;
+    console.log('Extracted fields:', { title, startTime, endTime, description, location, attendees, providerId, calendarId });
 
     if (!title || !startTime || !endTime) {
       console.log('Validation failed - missing required fields:', { 
@@ -120,7 +120,8 @@ export async function POST(request: NextRequest) {
         location,
         startTime: new Date(startTime),
         endTime: new Date(endTime),
-        attendees: [] // Add attendees if needed
+        attendees: [], // Add attendees if needed
+        calendarId: calendarId // Specify which calendar to use
       });
       
       calendarEventId = calendarEvent.id;
