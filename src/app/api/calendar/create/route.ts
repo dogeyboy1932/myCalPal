@@ -5,7 +5,7 @@ import { authOptions } from '../../../../lib/auth';
 import { EventDraft } from '../../../../models';
 import { CalendarEvent } from '../../../../types';
 import { connectToDatabase } from '../../../../lib/mongodb';
-import { createCalendarService } from '../../../../lib/services/calendar';
+import { createCalendarService2 } from '../../../../lib/services/calendar';
 import mongoose from 'mongoose';
 
 export async function POST(request: NextRequest) {
@@ -93,33 +93,42 @@ export async function POST(request: NextRequest) {
       throw dbError;
     }
 
-    // Now publish to Google Calendar
+    // Now publish to the selected calendar provider
     let calendarEventId = null;
     let calendarEventUrl = null;
     
     try {
-      console.log('Publishing event to Google Calendar...');
-      const calendarService = createCalendarService({
-        accessToken: (session as any).accessToken,
-        refreshToken: (session as any).refreshToken
-      });
+      console.log(`Publishing event to ${providerId} Calendar...`);
+      
+      // Get provider-specific tokens from session
+      const providerTokens = (session as any).providerTokens;
+      const tokens = providerTokens?.[providerId];
+      
+      if (!tokens) {
+        throw new Error(`No tokens found for provider: ${providerId}`);
+      }
+      
+      const calendarService = createCalendarService2({
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken
+      }, providerId as any);
       
       const calendarEvent = await calendarService.createEvent({
         providerId,
         title,
         description,
         location,
-        startTime,
-        endTime,
+        startTime: new Date(startTime),
+        endTime: new Date(endTime),
         attendees: [] // Add attendees if needed
       });
       
       calendarEventId = calendarEvent.id;
       calendarEventUrl = calendarEvent.url;
       
-      console.log('✅ Event published to Google Calendar:', calendarEventId);
+      console.log(`✅ Event published to ${providerId} Calendar:`, calendarEventId);
     } catch (calendarError: any) {
-      console.error('Google Calendar API error:', calendarError.message);
+      console.error(`${providerId} Calendar API error:`, calendarError.message);
       // Don't fail the entire request if calendar publishing fails
       // The event is still saved as a draft
     }

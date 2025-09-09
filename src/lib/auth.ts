@@ -72,12 +72,12 @@ export const authOptions: NextAuthOptions = {
   
   callbacks: {
     async signIn({ user, account, profile }) {
-      // Allow any user with a valid Google account to sign in
+      // Allow any user with a valid account to sign in
       if (!account || !user.email) {
         return false;
       }
       
-      console.log('✅ Google OAuth Sign-in successful:', {
+      console.log(`✅ ${account.provider} OAuth Sign-in successful:`, {
         user: user.email,
         provider: account.provider,
         name: user.name
@@ -101,26 +101,45 @@ export const authOptions: NextAuthOptions = {
           const accounts = client.db().collection('accounts');
           
           // Try both string and ObjectId formats for userId
-          const googleAccount = await accounts.findOne({
+          const accounts_data = await accounts.find({
             $or: [
               { userId: user.id },
               { userId: new (require('mongodb')).ObjectId(user.id) }
-            ],
-            provider: 'google'
-          });
+            ]
+          }).toArray();
           
-          console.log('🔍 Google account found:', !!googleAccount);
-          if (googleAccount) {
-            console.log('🔍 Account data:', {
-              hasAccessToken: !!googleAccount.access_token,
-              hasRefreshToken: !!googleAccount.refresh_token,
-              expiresAt: googleAccount.expires_at
+          console.log('🔍 Accounts found:', accounts_data.length);
+          
+          // Store tokens for all providers
+          const providerTokens: any = {};
+          
+          for (const account of accounts_data) {
+            console.log(`🔍 ${account.provider} account found:`, {
+              hasAccessToken: !!account.access_token,
+              hasRefreshToken: !!account.refresh_token,
+              expiresAt: account.expires_at
             });
+            
+            providerTokens[account.provider] = {
+              accessToken: account.access_token,
+              refreshToken: account.refresh_token,
+              tokenExpiry: account.expires_at
+            };
+          }
+          
+          // Set tokens in session
+          (session as any).providerTokens = providerTokens;
+          
+          // Backward compatibility - set Google tokens as default
+          const googleAccount = accounts_data.find(acc => acc.provider === 'google');
+          if (googleAccount) {
             (session as any).accessToken = googleAccount.access_token;
             (session as any).refreshToken = googleAccount.refresh_token;
             (session as any).tokenExpiry = googleAccount.expires_at;
-          } else {
-            console.log('❌ No Google account found for user:', user.id);
+          }
+          
+          if (accounts_data.length === 0) {
+            console.log('❌ No accounts found for user:', user.id);
           }
         } catch (error) {
           console.error('Error fetching user tokens:', error);
