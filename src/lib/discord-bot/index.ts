@@ -4,8 +4,8 @@ import fetch from 'node-fetch';
 
 // Basic config
 const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
-const RECEIVER_URL = process.env.RECEIVER_URL || 'http://localhost:3000/api/ingest/discord';
-const RECEIVER_TOKEN = process.env.RECEIVER_TOKEN || process.env.IMAGE_RECEIVER_TOKEN || '';
+const RECEIVER_URL = process.env.RECEIVER_URL || 'http://localhost:3000/api/receiver/image';
+const RECEIVER_TOKEN = process.env.IMAGE_RECEIVER_TOKEN || '';
 const ALLOWED_CHANNELS = (process.env.ALLOWED_CHANNELS || '')
   .split(',')
   .map(s => s.trim())

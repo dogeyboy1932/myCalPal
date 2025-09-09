@@ -4,11 +4,7 @@ import { CalendarEvent, CalendarProvider } from '../../types';
 import { BaseCalendarProvider, CalendarTokens } from './calendar/base';
 import { createCalendarService } from './calendar/factory';
 
-// Legacy interface for backward compatibility
-// export interface CalendarTokens {
-//   accessToken: string;
-//   refreshToken?: string;
-// }
+
 
 // Updated CalendarService that uses the abstraction layer
 export class CalendarService {
@@ -33,8 +29,4 @@ export class CalendarService {
   async listEvents(calendarId: string = 'primary') {
     return this.provider.listEvents({ calendarId });
   }
-}
-
-export function createCalendarService2(tokens: CalendarTokens, provider: CalendarProvider = 'google') {
-  return new CalendarService(tokens, provider);
 }

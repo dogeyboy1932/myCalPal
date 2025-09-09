@@ -1,37 +1,31 @@
 // Image receiver endpoint for bot integrations (e.g., Discord)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { mkdir, writeFile } from 'fs/promises';
-import { existsSync } from 'fs';
-import path from 'path';
 import sharp from 'sharp';
-import mongoose from 'mongoose';
-import { connectToDatabase } from '../../../../lib/mongodb';
-import { EventDraft } from '../../../../models';
+// import mongoose from 'mongoose';
+// import { connectToDatabase } from '../../../../lib/mongodb';
+// import { EventDraft } from '../../../../models';
 import { broadcastToClients } from '../../websocket/route';
+import { geminiService } from '../../../../lib/services/gemini';
+import { AIExtractionResult } from '../../../../types';
 
-const TEMP_UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'temp');
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 
 function getReceiverToken() {
-  return process.env.RECEIVER_TOKEN || process.env.IMAGE_RECEIVER_TOKEN || '';
+  return process.env.IMAGE_RECEIVER_TOKEN || '';
 }
 
-// async function ensureTempUploadDir() {
-//   if (!existsSync(TEMP_UPLOAD_DIR)) {
-//     await mkdir(TEMP_UPLOAD_DIR, { recursive: true });
+
+
+// function getDefaultUserId(): mongoose.Types.ObjectId {
+//   const envId = process.env.RECEIVER_DEFAULT_USER_ID;
+//   if (envId && mongoose.Types.ObjectId.isValid(envId)) {
+//     return new mongoose.Types.ObjectId(envId);
 //   }
+//   // Fallback: generate a placeholder ObjectId (draft may not show for any real user)
+//   return new mongoose.Types.ObjectId();
 // }
-
-function getDefaultUserId(): mongoose.Types.ObjectId {
-  const envId = process.env.RECEIVER_DEFAULT_USER_ID;
-  if (envId && mongoose.Types.ObjectId.isValid(envId)) {
-    return new mongoose.Types.ObjectId(envId);
-  }
-  // Fallback: generate a placeholder ObjectId (draft may not show for any real user)
-  return new mongoose.Types.ObjectId();
-}
 
 export async function POST(request: NextRequest) {
   console.log("REACHED HERE")
@@ -122,43 +116,54 @@ export async function POST(request: NextRequest) {
     const discordChannelId = (formData.get('discordChannelId') as string) || undefined;
     const discordAuthorId = (formData.get('discordAuthorId') as string) || undefined;
 
-    // Forward the processed image to /api/extract
-    const extractFormData = new FormData();
-    extractFormData.append('image', new Blob([processedBuffer], { type: file.type }), file.name);
+    // Extract event from image using Gemini directly
+    const startTime = Date.now();
+    let extractedData;
     
-    const extractResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/extract`, {
-      method: 'POST',
-      body: extractFormData,
-      headers: {
-        'x-receiver-token': expectedToken
-      }
-    });
-    
-    if (!extractResponse.ok) {
-      console.error('❌ Extract API failed:', extractResponse.status, extractResponse.statusText);
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Failed to extract event data' 
+    try {
+      extractedData = await geminiService.extractEventFromImage(processedBuffer, file.type);
+      console.log('=== EXTRACTED DATA JSON ===');
+      console.log(JSON.stringify(extractedData, null, 2));
+      console.log('=== END EXTRACTED DATA ===');
+    } catch (error) {
+      console.error('❌ Gemini extraction failed:', error);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to extract event from image'
       }, { status: 500 });
     }
+    const processingTime = Date.now() - startTime;
     
-    const extractResult = await extractResponse.json();
-    console.log('✅ Extract API response:', extractResult);
+    const extractResult: AIExtractionResult = {
+      id: `extraction_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      imageId: `image_${Date.now()}`,
+      userId: 'receiver@internal',
+      status: 'completed',
+      extractedData,
+      confidence: extractedData.confidence,
+      processingTime,
+      model: 'gemini-1.5-flash',
+      extractedFields: Object.keys(extractedData).filter(key => extractedData[key as keyof typeof extractedData] !== undefined),
+      createdAt: new Date(),
+      completedAt: new Date()
+    };
     
-    if (extractResult.success && extractResult.data) {
+    console.log('✅ Direct extraction completed:', extractResult);
+    
+    if (extractResult.status === 'completed' && extractedData) {
       // Create ExtractedEvent object like the frontend does
       const newEvent = {
         id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        title: extractResult.data.extractedData.title,
-        date: extractResult.data.extractedData.date,
-        time: extractResult.data.extractedData.time,
-        startTime: extractResult.data.extractedData.startTime,
-        endTime: extractResult.data.extractedData.endTime,
-        location: extractResult.data.extractedData.location,
-        description: extractResult.data.extractedData.description,
-        attendees: extractResult.data.extractedData.attendees || [],
-        category: extractResult.data.extractedData.category,
-        confidence: extractResult.data.confidence || 0,
+        title: extractedData.title,
+        date: extractedData.date,
+        time: extractedData.time,
+        startTime: extractedData.startTime,
+        endTime: extractedData.endTime,
+        location: extractedData.location,
+        description: extractedData.description,
+        attendees: extractedData.attendees || [],
+        category: extractedData.category,
+        confidence: extractedData.confidence || 0,
         status: 'draft',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -166,62 +171,82 @@ export async function POST(request: NextRequest) {
       
       console.log('📝 Created event object:', newEvent);
       
-      // Save as EventDraft to database
+      // Database operations commented out for now - focusing on drafting functionality
+      // try {
+      //   await connectToDatabase();
+      //   
+      //   const eventDraft = new EventDraft({
+      //     userId: getDefaultUserId(),
+      //     status: 'draft',
+      //     title: newEvent.title,
+      //     extractedData: newEvent,
+      //     confidence: newEvent.confidence,
+      //     createdAt: new Date(),
+      //     updatedAt: new Date()
+      //   });
+      //   
+      //   await eventDraft.save();
+      //   console.log('💾 Event draft saved to database:', eventDraft._id);
+      // } catch (dbError) {
+      //   console.error('❌ Database save failed:', dbError);
+      // }
+      
+      // Emit WebSocket notification for draft creation
       try {
-        await connectToDatabase();
-        
-        const eventDraft = new EventDraft({
-          userId: getDefaultUserId(),
-          status: 'draft',
-          title: newEvent.title,
-          extractedData: newEvent,
-          confidence: newEvent.confidence,
-          createdAt: new Date(),
-          updatedAt: new Date()
+        broadcastToClients({
+          type: 'draft_created',
+          draft: {
+            id: newEvent.id,
+            title: newEvent.title,
+            status: 'draft',
+            createdAt: newEvent.createdAt
+          },
+          message: `New event draft created: ${newEvent.title}`,
+          timestamp: new Date().toISOString()
         });
-        
-        await eventDraft.save();
-        console.log('💾 Event draft saved to database:', eventDraft._id);
-        
-        // Emit WebSocket notification for draft creation
-        try {
-          broadcastToClients({
-            type: 'draft_created',
-            draft: {
-              id: eventDraft.id.toString(),
-              title: newEvent.title,
-              status: 'draft',
-              createdAt: eventDraft.createdAt.toISOString()
-            },
-            message: `New event draft created: ${newEvent.title}`,
-            timestamp: new Date().toISOString()
-          });
-          console.log('📡 Draft creation WebSocket event sent');
-        } catch (wsError) {
-          console.error('WebSocket broadcast failed:', wsError);
-        }
-        
-        return NextResponse.json({
-          success: true,
-          message: 'Image processed and event draft created',
-          draftId: eventDraft._id,
-          event: newEvent,
-          extractionResult: extractResult.data
-        });
-      } catch (dbError) {
-        console.error('❌ Database save failed:', dbError);
-        // Still return success since extraction worked
-        return NextResponse.json({
-          success: true,
-          message: 'Image processed but draft save failed',
-          event: newEvent,
-          extractionResult: extractResult.data,
-          warning: 'Could not save to database'
-        });
+        console.log('📡 Draft creation WebSocket event sent');
+      } catch (wsError) {
+        console.error('WebSocket broadcast failed:', wsError);
       }
+      
+      // Emit WebSocket event for real-time updates to frontend
+      try {
+        const eventData = {
+          type: 'event_extracted',
+          event: {
+            title: extractedData.title,
+            date: extractedData.date,
+            time: extractedData.time,
+            startTime: extractedData.startTime,
+            endTime: extractedData.endTime,
+            location: extractedData.location,
+            description: extractedData.description,
+            attendees: extractedData.attendees || [],
+            category: extractedData.category,
+            confidence: extractedData.confidence || 0
+          },
+          timestamp: new Date().toISOString(),
+          userId: 'receiver@internal'
+        };
+        
+        broadcastToClients(eventData);
+        console.log('📡 Event extraction WebSocket event broadcasted:', eventData.event.title);
+      } catch (wsError) {
+        console.error('WebSocket broadcast failed:', wsError);
+      }
+      
+      return NextResponse.json({
+        success: true,
+        message: 'Image processed and event draft created (no database persistence)',
+        event: newEvent,
+        extractionResult: extractResult
+      });
     }
     
-    return NextResponse.json(extractResult, { status: extractResponse.status });
+    return NextResponse.json({
+      success: true,
+      data: extractResult
+    });
   } catch (error) {
     console.error('Image receiver error:', error);
     return NextResponse.json(

@@ -133,9 +133,9 @@ function HomeComponent() {
 
     try {
       const formData = new FormData();
-      formData.append('image', file);
+      formData.append('file', file);
 
-      const response = await fetch('/api/extract', {
+      const response = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
       });
@@ -146,34 +146,12 @@ function HomeComponent() {
 
       const result = await response.json();
 
-      console.log(result.data.extractedData)
+      console.log('Upload result:', result);
       
-      if (result.success && result.data) {
-        // Display raw JSON for debugging
-        // console.log('Raw extraction result:', JSON.stringify(result, null, 2));
-        
-        // Show raw JSON in UI for debugging
-        // const debugInfo = document.createElement('div');
-        // debugInfo.innerHTML = `
-        //   <h3>Debug: Raw AI Extraction Data</h3>
-        //   <pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; overflow: auto; max-height: 300px;">
-        //     ${JSON.stringify(result, null, 2)}
-        //   </pre>
-        // `;
-        // document.body.appendChild(debugInfo);
-        
+      if (result.success && result.event) {
+        // The receiver/image endpoint now returns the event directly
         const newEvent: ExtractedEvent = {
-            id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            title: result.data.extractedData.title,
-            date: result.data.extractedData.date,
-            time: result.data.extractedData.time,
-            startTime: result.data.extractedData.startTime,
-            endTime: result.data.extractedData.endTime,
-            location: result.data.extractedData.location,
-            description: result.data.extractedData.description,
-            attendees: result.data.extractedData.attendees || [],
-            category: result.data.extractedData.category,
-            confidence: result.data.confidence || 0,
+            ...result.event,
             status: 'draft' as const,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
@@ -496,7 +474,7 @@ function HomeComponent() {
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium text-gray-900">Event Drafts</h2>
-                <div className="flex items-center gap-4">
+                {/* <div className="flex items-center gap-4">
                   <button
                     onClick={handleTestCalendarCreate}
                     className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm"
@@ -506,7 +484,7 @@ function HomeComponent() {
                   <span className="text-sm text-gray-500">
                     {eventDrafts.length} {eventDrafts.length === 1 ? 'draft' : 'drafts'}
                   </span>
-                </div>
+                </div> */}
               </div>
               
               {eventDrafts.length === 0 ? (

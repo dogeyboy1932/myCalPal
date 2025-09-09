@@ -7,7 +7,7 @@
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
-    "bot": "pnpm dlx tsx src/discord-bot/index.ts"
+    "bot": "pnpm dlx tsx src/lib/discord-bot/index.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",

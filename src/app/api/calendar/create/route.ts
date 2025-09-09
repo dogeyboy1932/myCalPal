@@ -5,7 +5,7 @@ import { authOptions } from '../../../../lib/auth';
 import { EventDraft } from '../../../../models';
 import { CalendarEvent } from '../../../../types';
 import { connectToDatabase } from '../../../../lib/mongodb';
-import { createCalendarService2 } from '../../../../lib/services/calendar';
+import { CalendarService } from '../../../../lib/services/calendar';
 import mongoose from 'mongoose';
 
 export async function POST(request: NextRequest) {
@@ -108,10 +108,10 @@ export async function POST(request: NextRequest) {
         throw new Error(`No tokens found for provider: ${providerId}`);
       }
       
-      const calendarService = createCalendarService2({
+      const calendarService = new CalendarService({
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken
-      }, providerId as any);
+      });
       
       const calendarEvent = await calendarService.createEvent({
         providerId,

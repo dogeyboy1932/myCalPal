@@ -7,7 +7,8 @@ import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import sharp from 'sharp';
-import { UploadedFile } from '../../../types';
+import { UploadedFile, AIExtractionResult } from '../../../types';
+import { geminiService } from '../../../lib/services/gemini';
 
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -87,9 +88,74 @@ export async function POST(request: NextRequest) {
       uploadedBy: session.user.email
     };
 
+    // Extract event from image using Gemini
+    const startTime = Date.now();
+    let extractedData;
+    
+    try {
+      extractedData = await geminiService.extractEventFromImage(processedBuffer, 'image/jpeg');
+      console.log('=== EXTRACTED DATA JSON ===');
+      console.log(JSON.stringify(extractedData, null, 2));
+      console.log('=== END EXTRACTED DATA ===');
+    } catch (error) {
+      console.error('❌ Gemini extraction failed:', error);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to extract event from image'
+      }, { status: 500 });
+    }
+    const processingTime = Date.now() - startTime;
+    
+    const extractResult: AIExtractionResult = {
+      id: `extraction_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      imageId: uploadedFile.id,
+      userId: session.user.email || 'unknown',
+      status: 'completed',
+      extractedData,
+      confidence: extractedData.confidence,
+      processingTime,
+      model: 'gemini-1.5-flash',
+      extractedFields: Object.keys(extractedData).filter(key => extractedData[key as keyof typeof extractedData] !== undefined),
+      createdAt: new Date(),
+      completedAt: new Date()
+    };
+    
+    console.log('✅ Direct extraction completed:', extractResult);
+    
+    if (extractResult.status === 'completed' && extractedData) {
+      // Create ExtractedEvent object like the frontend expects
+      const newEvent = {
+        id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        title: extractedData.title,
+        date: extractedData.date,
+        time: extractedData.time,
+        startTime: extractedData.startTime,
+        endTime: extractedData.endTime,
+        location: extractedData.location,
+        description: extractedData.description,
+        attendees: extractedData.attendees || [],
+        category: extractedData.category,
+        confidence: extractedData.confidence || 0,
+        status: 'draft',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      console.log('📝 Created event object:', newEvent);
+      
+      return NextResponse.json({
+        success: true,
+        message: 'Image processed and event extracted',
+        event: newEvent,
+        extractionResult: extractResult,
+        data: uploadedFile
+      });
+    }
+
     return NextResponse.json({
       success: true,
-      data: uploadedFile
+      data: uploadedFile,
+      extractionResult: extractResult
     });
 
   } catch (error) {

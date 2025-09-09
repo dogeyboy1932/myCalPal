@@ -3,20 +3,20 @@
 import { NextAuthOptions } from 'next-auth';
 import { CalendarProvider } from '../types';
 
-import { MongoDBAdapter } from '@next-auth/mongodb-adapter';
+// import { MongoDBAdapter } from '@next-auth/mongodb-adapter';
 import GoogleProvider from 'next-auth/providers/google';
-import { MongoClient } from 'mongodb';
-import { connectToDatabase } from './mongodb';
-import { User } from '../models';
+// import { MongoClient } from 'mongodb';
+// import { connectToDatabase } from './mongodb';
+// import { User } from '../models';
 
 // MongoDB client for NextAuth adapter
-const client = new MongoClient(process.env.MONGODB_URI!);
-const clientPromise = client.connect();
+// const client = new MongoClient(process.env.MONGODB_URI!);
+// const clientPromise = client.connect();
 
 
 
 export const authOptions: NextAuthOptions = {
-  adapter: MongoDBAdapter(clientPromise),
+  // adapter: MongoDBAdapter(clientPromise),
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -32,7 +32,7 @@ export const authOptions: NextAuthOptions = {
   ],
   
   session: {
-    strategy: 'database',
+    strategy: 'jwt', // Changed from 'database' to 'jwt'
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   
@@ -69,99 +69,80 @@ export const authOptions: NextAuthOptions = {
         name: user.name
       });
       
-      try {
-        // Check if user already exists with this email
-        await connectToDatabase();
-        const client = await clientPromise;
-        const users = client.db().collection('users');
-        const accounts = client.db().collection('accounts');
-        
-        const existingUser = await users.findOne({ email: user.email });
-        
-        if (existingUser) {
-          // Check if this provider is already linked to this user
-          const existingAccount = await accounts.findOne({
-            userId: existingUser._id,
-            provider: account.provider
-          });
-          
-          if (!existingAccount) {
-            console.log(`🔗 Linking ${account.provider} account to existing user: ${user.email}`);
-            // Allow linking - NextAuth will handle the account creation
-          }
-        }
-        
-        return true;
-      } catch (error) {
-        console.error('Error in signIn callback:', error);
-        return true; // Allow sign-in even if there's an error
-      }
+      // MongoDB database operations commented out for JWT sessions
+      // try {
+      //   // Check if user already exists with this email
+      //   await connectToDatabase();
+      //   const client = await clientPromise;
+      //   const users = client.db().collection('users');
+      //   const accounts = client.db().collection('accounts');
+      //   
+      //   const existingUser = await users.findOne({ email: user.email });
+      //   
+      //   if (existingUser) {
+      //     // Check if this provider is already linked to this user
+      //     const existingAccount = await accounts.findOne({
+      //       userId: existingUser._id,
+      //       provider: account.provider
+      //     });
+      //     
+      //     if (!existingAccount) {
+      //       console.log(`🔗 Linking ${account.provider} account to existing user: ${user.email}`);
+      //       // Allow linking - NextAuth will handle the account creation
+      //     }
+      //   }
+      //   
+      //   return true;
+      // } catch (error) {
+      //   console.error('Error in signIn callback:', error);
+      //   return true; // Allow sign-in even if there's an error
+      // }
+      
+      return true;
     },
     
-    async session({ session, user, token }) {
-      // With database sessions, user info comes from the database
-      if (user && session.user) {
-        session.user.id = user.id;
+    async session({ session, token }) {
+      // With JWT sessions, user info comes from the token
+      if (token && session.user) {
+        session.user.id = token.sub!;
         
-        // Get the user's Google account tokens from the database
-        try {
-          console.log('🔍 Fetching tokens for user:', user.id);
-          await connectToDatabase();
-          const client = await clientPromise;
-          const accounts = client.db().collection('accounts');
-          
-          // Try both string and ObjectId formats for userId
-          const accounts_data = await accounts.find({
-            $or: [
-              { userId: user.id },
-              { userId: new (require('mongodb')).ObjectId(user.id) }
-            ]
-          }).toArray();
-          
-          console.log('🔍 Accounts found:', accounts_data.length);
-          
-          // Store tokens for all providers
-          const providerTokens: any = {};
-          
-          for (const account of accounts_data) {
-            console.log(`🔍 ${account.provider} account found:`, {
-              hasAccessToken: !!account.access_token,
-              hasRefreshToken: !!account.refresh_token,
-              expiresAt: account.expires_at
-            });
-            
-            providerTokens[account.provider] = {
-              accessToken: account.access_token,
-              refreshToken: account.refresh_token,
-              tokenExpiry: account.expires_at
-            };
-          }
-          
-          // Set tokens in session
-          (session as any).providerTokens = providerTokens;
-          
-          // Backward compatibility - set Google tokens as default
-          const googleAccount = accounts_data.find(acc => acc.provider === 'google');
-          if (googleAccount) {
-            (session as any).accessToken = googleAccount.access_token;
-            (session as any).refreshToken = googleAccount.refresh_token;
-            (session as any).tokenExpiry = googleAccount.expires_at;
-          }
-          
-          if (accounts_data.length === 0) {
-            console.log('❌ No accounts found for user:', user.id);
-          }
-        } catch (error) {
-          console.error('Error fetching user tokens:', error);
+        // Store OAuth tokens in session from JWT token
+        if (token.accessToken) {
+          (session as any).accessToken = token.accessToken;
         }
+        if (token.refreshToken) {
+          (session as any).refreshToken = token.refreshToken;
+        }
+        if (token.tokenExpiry) {
+          (session as any).tokenExpiry = token.tokenExpiry;
+        }
+        
+        console.log('🔍 JWT Session:', {
+          hasUser: !!session.user,
+          hasAccessToken: !!token.accessToken,
+          hasRefreshToken: !!token.refreshToken
+        });
       }
       
-      console.log('🔍 Final session:', {
-        hasUser: !!session.user,
-        hasAccessToken: !!(session as any).accessToken,
-        hasRefreshToken: !!(session as any).refreshToken
-      });
       return session;
+    },
+    
+    async jwt({ token, account, profile }) {
+      // Store OAuth tokens in JWT token on first sign in
+      if (account) {
+        token.accessToken = account.access_token;
+        token.refreshToken = account.refresh_token;
+        token.tokenExpiry = account.expires_at;
+        
+        console.log('🔍 Storing tokens in JWT:', {
+          provider: account.provider,
+          hasAccessToken: !!account.access_token,
+          hasRefreshToken: !!account.refresh_token,
+          expiresAt: account.expires_at
+        });
+      }
+      
+      return token;
     },
     
     async redirect({ url, baseUrl }) {
