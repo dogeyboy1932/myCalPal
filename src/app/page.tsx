@@ -135,6 +135,8 @@ function HomeComponent() {
       const formData = new FormData();
       formData.append('file', file);
 
+      console.log("UPLOADING 1")
+
       const response = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
@@ -171,7 +173,7 @@ function HomeComponent() {
         throw new Error(result.error || 'Failed to extract event information');
       }
     } catch (error) {
-      console.error('Upload error:', error);
+      console.error('Upload error2:', error);
       setUploadError(error instanceof Error ? error.message : 'Upload failed');
     } finally {
       setIsUploading(false);

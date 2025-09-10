@@ -32,9 +32,9 @@ export async function GET(request: NextRequest) {
       
       console.log(`🔌 SSE client connected. Total connections: ${sseConnections.size}`);
     },
-    cancel() {
+    cancel(controller) {
       // Remove this connection when client disconnects
-      sseConnections.delete(this as any);
+      sseConnections.delete(controller);
       console.log(`🔌 SSE client disconnected. Total connections: ${sseConnections.size}`);
     }
   });

@@ -3,24 +3,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../lib/auth';
-import { writeFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import path from 'path';
 import sharp from 'sharp';
 import { UploadedFile, AIExtractionResult } from '../../../types';
 import { geminiService } from '../../../lib/services/gemini';
 
-const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 
-async function ensureUploadDir() {
-  if (!existsSync(UPLOAD_DIR)) {
-    await mkdir(UPLOAD_DIR, { recursive: true });
-  }
-}
-
 export async function POST(request: NextRequest) {
+
+  console.log("UPLOADING")
+  console.log('Environment check:', {
+    hasGeminiKey: !!process.env.GEMINI_API_KEY,
+    hasMongoUri: !!process.env.MONGODB_URI,
+    hasNextAuthSecret: !!process.env.NEXTAUTH_SECRET,
+    nodeEnv: process.env.NODE_ENV
+  });
+
   try {
     // Check authentication
     const session = await getServerSession(authOptions);
@@ -57,15 +56,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await ensureUploadDir();
-
-    // Generate filename
+    // Generate unique ID for this upload
     const timestamp = Date.now();
     const randomId = Math.random().toString(36).substr(2, 9);
     const filename = `${timestamp}_${randomId}.jpg`;
-    const filePath = path.join(UPLOAD_DIR, filename);
 
-    // Process and save image
+    // Process image in memory (no file system operations)
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     
@@ -75,15 +71,13 @@ export async function POST(request: NextRequest) {
       .jpeg({ quality: 85 })
       .toBuffer();
 
-    await writeFile(filePath, processedBuffer);
-
     const uploadedFile: UploadedFile = {
       id: `${timestamp}_${randomId}`,
       filename,
       originalName: file.name,
       mimeType: 'image/jpeg',
       size: processedBuffer.length,
-      path: filePath,
+      path: `memory://${filename}`, // Indicate this is in-memory processing
       uploadedAt: new Date(),
       uploadedBy: session.user.email
     };
@@ -159,9 +153,20 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Upload error:', error);
+    console.error('Upload error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined,
+      error: error
+    });
+    
     return NextResponse.json(
-      { success: false, error: 'Upload failed' },
+      { 
+        success: false, 
+        error: 'Upload failed',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
+      },
       { status: 500 }
     );
   }
