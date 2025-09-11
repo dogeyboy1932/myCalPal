@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../lib/auth';
 import connectToDatabase from '../../../lib/mongodb';
 import Event, { IEvent } from '../../../models/Event';
@@ -38,9 +38,23 @@ export async function getRecentEvents(userId: string, limit: number = 10) {
 export async function GET(request: NextRequest) {
   try {
     // Check authentication
+    console.log('🔍 Attempting to get server session...');
     const session = await getServerSession(authOptions);
+    console.log('🔍 Session result:', {
+      hasSession: !!session,
+      hasUser: !!session?.user,
+      userEmail: session?.user?.email,
+      hasAccessToken: !!(session as any)?.accessToken,
+      hasRefreshToken: !!(session as any)?.refreshToken
+    });
+    
     if (!session) {
-      console.log('Unauthorized access to recent events API');
+      console.log('❌ Unauthorized access to recent events API - no session found');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    if (!session.user) {
+      console.log('❌ Unauthorized access to recent events API - no user in session');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

@@ -1,6 +1,6 @@
 // Simplified calendar event creation API
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../../lib/auth';
 import { EventDraft } from '../../../../models';
 import { CalendarEvent } from '../../../../types';

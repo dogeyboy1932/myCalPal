@@ -1,7 +1,7 @@
 // Unified image receiver endpoint for bot integrations and web uploads
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../../lib/auth';
 import sharp from 'sharp';
 import { randomUUID } from 'crypto';
