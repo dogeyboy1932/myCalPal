@@ -44,13 +44,59 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log('Fetching recent events for user:', session.user?.email);
-    const recentEvents = await getRecentEvents(session.user?.email || '');
-    console.log('Returning recent events:', recentEvents.length);
+    // Get query parameters
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get('status') || 'draft';
+    const limit = parseInt(searchParams.get('limit') || '10');
+
+    console.log(`🔍 API Request Details:`);
+    console.log(`  - Status filter: '${status}'`);
+    console.log(`  - Limit: ${limit}`);
+    console.log(`  - User email: ${session.user?.email}`);
+    console.log(`  - Full URL: ${request.url}`);
     
-    return NextResponse.json({ events: recentEvents });
+    await connectToDatabase();
+    
+    // Query for both user's events and Discord bot events
+    const query = {
+      $or: [
+        { userId: session.user?.email || '' },
+        { userId: 'discord-bot' },
+        { userId: 'receiver@internal' }
+      ],
+      status: status 
+    };
+    console.log(`📊 MongoDB Query:`, JSON.stringify(query, null, 2));
+    
+    const events = await Event.find(query)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+    
+    console.log(`📋 Query Results:`);
+    console.log(`  - Found ${events.length} events with status '${status}'`);
+    console.log(`  - Events data:`, JSON.stringify(events, null, 2));
+    
+    // Also check total count in database for this user (including Discord bot events)
+    const userQuery = {
+      $or: [
+        { userId: session.user?.email || '' },
+        { userId: 'discord-bot' },
+        { userId: 'receiver@internal' }
+      ]
+    };
+    const totalCount = await Event.countDocuments(userQuery);
+    const draftCount = await Event.countDocuments({ ...userQuery, status: 'draft' });
+    const publishedCount = await Event.countDocuments({ ...userQuery, status: 'published' });
+    
+    console.log(`📈 Database Stats for user ${session.user?.email}:`);
+    console.log(`  - Total events: ${totalCount}`);
+    console.log(`  - Draft events: ${draftCount}`);
+    console.log(`  - Published events: ${publishedCount}`);
+    
+    return NextResponse.json({ events });
   } catch (error) {
-    console.error('Error fetching recent events:', error);
+    console.error('Error fetching events:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

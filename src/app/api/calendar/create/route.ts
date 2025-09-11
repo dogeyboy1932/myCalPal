@@ -100,17 +100,22 @@ export async function POST(request: NextRequest) {
     try {
       console.log(`Publishing event to ${providerId} Calendar...`);
       
-      // Get provider-specific tokens from session
-      const providerTokens = (session as any).providerTokens;
-      const tokens = providerTokens?.[providerId];
+      // Get tokens from session (stored directly for JWT strategy)
+      const accessToken = (session as any).accessToken;
+      const refreshToken = (session as any).refreshToken;
       
-      if (!tokens) {
+      if (!accessToken) {
         throw new Error(`No tokens found for provider: ${providerId}`);
       }
       
+      console.log('🔍 Using tokens from session:', {
+        hasAccessToken: !!accessToken,
+        hasRefreshToken: !!refreshToken
+      });
+      
       const calendarService = new CalendarService({
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken
+        accessToken: accessToken,
+        refreshToken: refreshToken
       });
       
       const calendarEvent = await calendarService.createEvent({

@@ -62,43 +62,7 @@ function HomeComponent() {
     localStorage.setItem('skipDrafts', JSON.stringify(skipDrafts));
   }, [skipDrafts]);
 
-  // Auto-refresh from MongoDB every 60 seconds
-  useEffect(() => {
-    const fetchEventsFromMongoDB = async () => {
-      try {
-        console.log('🔄 Auto-refresh: Fetching events from MongoDB...');
-        const response = await fetch('/api/drafts');
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log('📥 Auto-refresh data:', data);
-          
-          if (data.events && data.events.length > 0) {
-            setEventDrafts(data.events);
-            console.log('✨ Auto-refresh: Updated events from MongoDB');
-          }
-        } else {
-          console.error('❌ Auto-refresh API Error - Status:', response.status);
-        }
-      } catch (error) {
-        console.error('❌ Auto-refresh error:', error);
-      }
-    };
-
-    // Initial load from MongoDB
-    if (session) {
-      fetchEventsFromMongoDB();
-    }
-
-    // Set up 60-second polling
-    const interval = setInterval(() => {
-      if (session) {
-        fetchEventsFromMongoDB();
-      }
-    }, 60000); // 60 seconds
-
-    return () => clearInterval(interval);
-  }, [session]);
+  // Removed automatic polling - using manual refresh only
 
   const handleImageUpload = async (file: File) => {
     setIsUploading(true);
@@ -153,38 +117,14 @@ function HomeComponent() {
     }
   };
 
-  const handleSaveEvent = async (updatedEvent: ExtractedEvent) => {
-    try {
-      console.log('💾 Saving event to MongoDB:', updatedEvent.id);
-      
-      const response = await fetch('/api/drafts', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updatedEvent),
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        console.log('✅ Event saved to MongoDB successfully');
-        
-        // Update local state with the saved event
-        setEventDrafts(prev => 
-          prev.map(event => 
-            event.id === updatedEvent.id 
-              ? { ...result.event, updatedAt: new Date().toISOString() }
-              : event
-          )
-        );
-      } else {
-        console.error('❌ Failed to save event to MongoDB');
-        alert('Failed to save event. Please try again.');
-      }
-    } catch (error) {
-      console.error('❌ Error saving event:', error);
-      alert('Error saving event. Please try again.');
-    }
+  const handleSaveEvent = (updatedEvent: ExtractedEvent) => {
+    setEventDrafts(prev => 
+      prev.map(event => 
+        event.id === updatedEvent.id 
+          ? { ...updatedEvent, updatedAt: new Date().toISOString() }
+          : event
+      )
+    );
   };
 
   const handleDeleteEvent = (eventId: string) => {
@@ -241,7 +181,8 @@ function HomeComponent() {
       }
 
       const result = await response.json();
-      
+      console.log(result)
+
       if (result.success) {
         // Update event status to published
         setEventDrafts(prev => 
@@ -473,21 +414,36 @@ function HomeComponent() {
                 <div className="flex items-center gap-4">
                   <button
                     onClick={async () => {
+                      // alert('Button clicked! Check console for logs.');
                       console.log('🔄 Manual refresh triggered');
+                      console.log('Button click handler executed successfully');
                       try {
                         console.log('📡 Fetching from /api/drafts...');
                         const response = await fetch('/api/drafts');
                         
+                        console.log('📊 Response status:', response.status);
+                        console.log('📊 Response ok:', response.ok);
+                        console.log('📊 Response headers:', Object.fromEntries(response.headers.entries()));
+
                         if (response.ok) {
                           const data = await response.json();
                           console.log('📥 Manual refresh data:', data);
+                          console.log('📥 Events count:', data.events ? data.events.length : 'No events property');
                           
-                          if (data.events) {
-                            setEventDrafts(data.events);
-                            console.log('✨ Manual refresh: Updated', data.events.length, 'events from MongoDB');
+                          if (data.events && data.events.length > 0) {
+                            setEventDrafts(prevDrafts => {
+                              const newEvents = data.events.filter((newEvent: any) => 
+                                !prevDrafts.some(existingDraft => existingDraft.id === newEvent.id)
+                              );
+                              if (newEvents.length > 0) {
+                                console.log('✨ Manual refresh: Adding', newEvents.length, 'new events');
+                                return [...newEvents, ...prevDrafts];
+                              }
+                              console.log('ℹ️ No new events to add');
+                              return prevDrafts;
+                            });
                           } else {
-                            console.log('ℹ️ No events in response');
-                            setEventDrafts([]);
+                            console.log('ℹ️ No events in response or empty events array');
                           }
                         } else {
                           const errorText = await response.text();
@@ -495,6 +451,7 @@ function HomeComponent() {
                         }
                       } catch (error) {
                         console.error('❌ Manual refresh error:', error);
+                        console.error('❌ Error details:', error instanceof Error ? error.message : 'Unknown error');
                       }
                     }}
                     className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm flex items-center gap-2"
