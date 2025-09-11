@@ -1,12 +1,15 @@
-// Unified image receiver endpoint for bot integrations and web uploads with SSE
+// Unified image receiver endpoint for bot integrations and web uploads
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../lib/auth';
 import sharp from 'sharp';
-import { broadcastToClients } from '../../websocket/route';
-import { broadcastToStream } from '../../stream/route';
+import { randomUUID } from 'crypto';
+// Removed broadcast imports - using RECENT_EVENT array only
 import { addRecentEvent } from '../../drafts/route';
+// MongoDB imports for direct storage
+import connectToDatabase from '../../../../lib/mongodb';
+import Event from '../../../../models/Event';
 import { geminiService } from '../../../../lib/services/gemini';
 import { AIExtractionResult, UploadedFile } from '../../../../types';
 
@@ -69,6 +72,77 @@ export async function POST(request: NextRequest) {
       console.log('=== DISCORD TEXT RECEIVED ===');
       console.log({ text, source, discordMessageId, discordChannelId, discordAuthorId });
 
+      // Extract event from text using Gemini
+      console.log("🤖 [AI] Starting Gemini text extraction...");
+      let extractedData;
+      
+      try {
+        extractedData = await geminiService.extractEventFromText(text);
+        console.log("✅ [AI] Gemini text extraction successful");
+        console.log("🤖 [AI] Extracted data:", JSON.stringify(extractedData, null, 2));
+      } catch (error) {
+        console.error('❌ [AI] Gemini text extraction failed:', error);
+        return NextResponse.json({
+          success: false,
+          error: 'Failed to extract event from text'
+        }, { status: 500 });
+      }
+
+      // Create event if extraction was successful
+      if (extractedData && extractedData.title) {
+        const newEvent = {
+          id: `event_${randomUUID()}`,
+          title: extractedData.title,
+          date: extractedData.date,
+          time: extractedData.time,
+          startTime: extractedData.startTime,
+          endTime: extractedData.endTime,
+          location: extractedData.location,
+          description: extractedData.description,
+          attendees: extractedData.attendees || [],
+          category: extractedData.category,
+          confidence: extractedData.confidence,
+          status: 'draft' as const,
+          userId: 'discord-bot'
+        };
+
+        console.log('📝 [RECEIVER] Saving text-extracted event to MongoDB');
+        
+        try {
+          await connectToDatabase();
+          
+          const savedEvent = await Event.create({
+            ...newEvent,
+            userId: 'discord-bot',
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
+          
+          console.log('✅ Text event saved to MongoDB:', savedEvent._id);
+          
+          // Also add to RECENT_EVENT array for immediate access
+          await addRecentEvent(newEvent);
+          
+          return NextResponse.json({
+            success: true,
+            message: 'Text processed and event draft created',
+            event: newEvent
+          });
+          
+        } catch (dbError) {
+          console.error('❌ MongoDB save failed:', dbError);
+          // Still add to RECENT_EVENT array as fallback
+          await addRecentEvent(newEvent);
+          
+          return NextResponse.json({
+            success: true,
+            message: 'Text processed and event draft created (fallback storage)',
+            event: newEvent
+          });
+        }
+      }
+
+      // If no event extracted, return text data only
       return NextResponse.json({
         success: true,
         data: {
@@ -158,8 +232,8 @@ export async function POST(request: NextRequest) {
     console.log("⏱️ [AI] Processing time:", processingTime, "ms")
     
     const extractResult: AIExtractionResult = {
-      id: `extraction_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      imageId: `image_${Date.now()}`,
+      id: `extraction_${randomUUID()}`,
+      imageId: `image_${randomUUID()}`,
       userId: 'receiver@internal',
       status: 'completed',
       extractedData,
@@ -175,9 +249,9 @@ export async function POST(request: NextRequest) {
     
     if (extractResult.status === 'completed' && extractedData) {
       console.log('📝 [EVENT] Creating event object from extracted data...')
-      // Create ExtractedEvent object like the frontend does
+      // Store the event in MongoDB for drafting
       const newEvent = {
-        id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: `event_${randomUUID()}`,
         title: extractedData.title,
         date: extractedData.date,
         time: extractedData.time,
@@ -189,87 +263,41 @@ export async function POST(request: NextRequest) {
         category: extractedData.category,
         confidence: extractedData.confidence || 0,
         status: 'draft',
+        userId: 'receiver@internal',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
       
       console.log('📝 [EVENT] Created event object:', JSON.stringify(newEvent, null, 2));
       
-      // Store the event in RECENT_EVENT array
-      console.log('📝 [RECEIVER] Adding event to RECENT_EVENT array');
-      addRecentEvent(newEvent);
-      console.log('📝 [STORE] Event added to recent events successfully');
+      // Store event data directly without ICS file generation
+      console.log('📅 [STORE] Preparing event data for MongoDB storage...');
       
-      // Broadcast the event via SSE for real-time updates (for local development)
-      console.log('📡 [BROADCAST] Broadcasting event_extracted to SSE clients...')
-      broadcastToStream('event_extracted', newEvent);
-      console.log('📡 [BROADCAST] event_extracted broadcast completed')
+      // Store the event in MongoDB
+      console.log('📝 [RECEIVER] Saving event to MongoDB');
       
-      // Database operations commented out for now - focusing on drafting functionality
-      // try {
-      //   await connectToDatabase();
-      //   
-      //   const eventDraft = new EventDraft({
-      //     userId: getDefaultUserId(),
-      //     status: 'draft',
-      //     title: newEvent.title,
-      //     extractedData: newEvent,
-      //     confidence: newEvent.confidence,
-      //     createdAt: new Date(),
-      //     updatedAt: new Date()
-      //   });
-      //   
-      //   await eventDraft.save();
-      //   console.log('💾 Event draft saved to database:', eventDraft._id);
-      // } catch (dbError) {
-      //   console.error('❌ Database save failed:', dbError);
-      // }
-      
-      // Emit WebSocket notification for draft creation
-      console.log('📡 [WEBSOCKET] Broadcasting draft_created event...')
       try {
-        broadcastToClients({
-          type: 'draft_created',
-          draft: {
-            id: newEvent.id,
-            title: newEvent.title,
-            status: 'draft',
-            createdAt: newEvent.createdAt
-          },
-          message: `New event draft created: ${newEvent.title}`,
-          timestamp: new Date().toISOString()
-        });
-        console.log('📡 [WEBSOCKET] Draft creation WebSocket event sent');
-      } catch (wsError) {
-        console.error('❌ [WEBSOCKET] Draft creation broadcast failed:', wsError);
-      }
-      
-      // Emit WebSocket event for real-time updates to frontend
-      console.log('📡 [WEBSOCKET] Broadcasting event_extracted WebSocket event...')
-      try {
-        const eventData = {
-          type: 'event_extracted',
-          event: {
-            title: extractedData.title,
-            date: extractedData.date,
-            time: extractedData.time,
-            startTime: extractedData.startTime,
-            endTime: extractedData.endTime,
-            location: extractedData.location,
-            description: extractedData.description,
-            attendees: extractedData.attendees || [],
-            category: extractedData.category,
-            confidence: extractedData.confidence || 0
-          },
-          timestamp: new Date().toISOString(),
-          userId: 'receiver@internal'
-        };
+        await connectToDatabase();
         
-        broadcastToClients(eventData);
-        console.log('📡 [WEBSOCKET] Event extraction WebSocket event broadcasted:', eventData.event.title);
-      } catch (wsError) {
-        console.error('❌ [WEBSOCKET] Event extraction broadcast failed:', wsError);
+        const savedEvent = await Event.create({
+          ...newEvent,
+          userId: 'discord-bot', // Discord bot events
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+        
+        console.log('✅ Event saved to MongoDB:', savedEvent._id);
+        
+        // Also add to RECENT_EVENT array for immediate access
+        await addRecentEvent(newEvent);
+        
+      } catch (dbError) {
+        console.error('❌ MongoDB save failed:', dbError);
+        // Still add to RECENT_EVENT array as fallback
+        await addRecentEvent(newEvent);
       }
+      
+      // Event stored in RECENT_EVENT array - accessible via /api/drafts endpoint
       
       console.log('✅ [SUCCESS] Returning successful response with event data')
       return NextResponse.json({

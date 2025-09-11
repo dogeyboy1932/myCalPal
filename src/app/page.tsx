@@ -6,7 +6,7 @@ import { useSession, signIn, signOut } from 'next-auth/react';
 import { useState, useEffect } from 'react';
 import ImageUpload from '../components/ImageUpload';
 import EventDraft from '../components/EventDraft';
-import EventListener from '../components/EventListener';
+// Removed EventListener - no longer using SSE
 import { ExtractedEvent } from '../types';
 
 // Make this component dynamic to avoid SSR issues
@@ -29,7 +29,7 @@ function HomeComponent() {
   const [eventDrafts, setEventDrafts] = useState<ExtractedEvent[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [skipDrafts, setSkipDrafts] = useState(false);
-  const [wsConnected, setWsConnected] = useState(false);
+  // Removed wsConnected state - no longer using WebSocket
 
   // Load drafts and settings from localStorage on component mount
   useEffect(() => {
@@ -62,64 +62,43 @@ function HomeComponent() {
     localStorage.setItem('skipDrafts', JSON.stringify(skipDrafts));
   }, [skipDrafts]);
 
-  // Polling for recent events - only when authenticated
+  // Auto-refresh from MongoDB every 60 seconds
   useEffect(() => {
-    if (status === 'loading') return; // Wait for session to load
-    if (!session?.user?.email) {
-      console.log('🔒 No authenticated session, skipping polling');
-      return;
-    }
-
-    console.log('🔄 Starting polling for recent events for user:', session.user.email);
-    
-    const pollForUpdates = async () => {
+    const fetchEventsFromMongoDB = async () => {
       try {
-        console.log('🔄 [POLLING] Checking for new events...');
+        console.log('🔄 Auto-refresh: Fetching events from MongoDB...');
         const response = await fetch('/api/drafts');
         
         if (response.ok) {
           const data = await response.json();
-          console.log('📥 [POLLING] Received data:', data);
+          console.log('📥 Auto-refresh data:', data);
           
           if (data.events && data.events.length > 0) {
-            console.log('📝 [POLLING] Found', data.events.length, 'recent events');
-            
-            // Add new events to the existing drafts
-            setEventDrafts(prevDrafts => {
-              const newEvents = data.events.filter((newEvent: any) => 
-                !prevDrafts.some(existingDraft => existingDraft.id === newEvent.id)
-              );
-              
-              if (newEvents.length > 0) {
-                console.log('✨ [POLLING] Adding', newEvents.length, 'new events as drafts');
-                setActiveTab('drafts'); // Switch to drafts tab
-                return [...newEvents, ...prevDrafts];
-              }
-              
-              return prevDrafts;
-            });
-          } else {
-            console.log('📝 [POLLING] No recent events found');
+            setEventDrafts(data.events);
+            console.log('✨ Auto-refresh: Updated events from MongoDB');
           }
         } else {
-          console.error('❌ [POLLING] Failed to fetch recent events:', response.status);
+          console.error('❌ Auto-refresh API Error - Status:', response.status);
         }
       } catch (error) {
-        console.error('❌ [POLLING] Error during polling:', error);
+        console.error('❌ Auto-refresh error:', error);
       }
     };
-    
-    // Initial poll
-    pollForUpdates();
-    
-    // Set up polling interval (every 1 minute)
-     const pollInterval = setInterval(pollForUpdates, 60000);
-    
-    return () => {
-      console.log('🔄 Stopping polling interval');
-      clearInterval(pollInterval);
-    };
-  }, [session, status]);
+
+    // Initial load from MongoDB
+    if (session) {
+      fetchEventsFromMongoDB();
+    }
+
+    // Set up 60-second polling
+    const interval = setInterval(() => {
+      if (session) {
+        fetchEventsFromMongoDB();
+      }
+    }, 60000); // 60 seconds
+
+    return () => clearInterval(interval);
+  }, [session]);
 
   const handleImageUpload = async (file: File) => {
     setIsUploading(true);
@@ -174,14 +153,38 @@ function HomeComponent() {
     }
   };
 
-  const handleSaveEvent = (updatedEvent: ExtractedEvent) => {
-    setEventDrafts(prev => 
-      prev.map(event => 
-        event.id === updatedEvent.id 
-          ? { ...updatedEvent, updatedAt: new Date().toISOString() }
-          : event
-      )
-    );
+  const handleSaveEvent = async (updatedEvent: ExtractedEvent) => {
+    try {
+      console.log('💾 Saving event to MongoDB:', updatedEvent.id);
+      
+      const response = await fetch('/api/drafts', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedEvent),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Event saved to MongoDB successfully');
+        
+        // Update local state with the saved event
+        setEventDrafts(prev => 
+          prev.map(event => 
+            event.id === updatedEvent.id 
+              ? { ...result.event, updatedAt: new Date().toISOString() }
+              : event
+          )
+        );
+      } else {
+        console.error('❌ Failed to save event to MongoDB');
+        alert('Failed to save event. Please try again.');
+      }
+    } catch (error) {
+      console.error('❌ Error saving event:', error);
+      alert('Error saving event. Please try again.');
+    }
   };
 
   const handleDeleteEvent = (eventId: string) => {
@@ -359,14 +362,6 @@ function HomeComponent() {
             </div>
             
             <div className="flex items-center gap-4">
-              {/* WebSocket Status Indicator */}
-              <div className="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium">
-                <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                <span className={wsConnected ? 'text-green-700' : 'text-red-700'}>
-                  {wsConnected ? 'Live Updates' : 'Disconnected'}
-                </span>
-              </div>
-              
               <div className="flex items-center gap-2">
                 {session.user?.image && (
                   <img
@@ -465,7 +460,7 @@ function HomeComponent() {
             
             {/* Real-time Event Updates */}
             <div className="mt-6">
-              <EventListener />
+              {/* EventListener removed - using manual refresh instead */}
             </div>
           </div>
         )}
@@ -478,36 +473,21 @@ function HomeComponent() {
                 <div className="flex items-center gap-4">
                   <button
                     onClick={async () => {
-                      alert('Button clicked! Check console for logs.');
                       console.log('🔄 Manual refresh triggered');
-                      console.log('Button click handler executed successfully');
                       try {
                         console.log('📡 Fetching from /api/drafts...');
                         const response = await fetch('/api/drafts');
                         
-                        console.log('📊 Response status:', response.status);
-                        console.log('📊 Response ok:', response.ok);
-                        console.log('📊 Response headers:', Object.fromEntries(response.headers.entries()));
-
                         if (response.ok) {
                           const data = await response.json();
                           console.log('📥 Manual refresh data:', data);
-                          console.log('📥 Events count:', data.events ? data.events.length : 'No events property');
                           
-                          if (data.events && data.events.length > 0) {
-                            setEventDrafts(prevDrafts => {
-                              const newEvents = data.events.filter((newEvent: any) => 
-                                !prevDrafts.some(existingDraft => existingDraft.id === newEvent.id)
-                              );
-                              if (newEvents.length > 0) {
-                                console.log('✨ Manual refresh: Adding', newEvents.length, 'new events');
-                                return [...newEvents, ...prevDrafts];
-                              }
-                              console.log('ℹ️ No new events to add');
-                              return prevDrafts;
-                            });
+                          if (data.events) {
+                            setEventDrafts(data.events);
+                            console.log('✨ Manual refresh: Updated', data.events.length, 'events from MongoDB');
                           } else {
-                            console.log('ℹ️ No events in response or empty events array');
+                            console.log('ℹ️ No events in response');
+                            setEventDrafts([]);
                           }
                         } else {
                           const errorText = await response.text();
@@ -515,7 +495,6 @@ function HomeComponent() {
                         }
                       } catch (error) {
                         console.error('❌ Manual refresh error:', error);
-                        console.error('❌ Error details:', error instanceof Error ? error.message : 'Unknown error');
                       }
                     }}
                     className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm flex items-center gap-2"

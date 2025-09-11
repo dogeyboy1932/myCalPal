@@ -36,8 +36,11 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
       family: 4, // Use IPv4, skip trying IPv6
     };
 
-    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
-      console.log('✅ Connected to MongoDB');
+    // Ensure we connect to the calendar-app database
+    const dbUri = MONGODB_URI.includes('/calendar-app?') ? MONGODB_URI : MONGODB_URI.replace('/?', '/calendar-app?');
+    
+    cached.promise = mongoose.connect(dbUri, opts).then((mongoose) => {
+      console.log('✅ Connected to MongoDB (calendar-app database)');
       return mongoose;
     });
   }

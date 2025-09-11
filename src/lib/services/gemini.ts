@@ -76,6 +76,63 @@ If you cannot find specific information, use null for that field. Confidence sho
       throw new Error('Failed to extract event information from image');
     }
   }
+
+  async extractEventFromText(text: string): Promise<ExtractedEvent> {
+    try {
+      const prompt = `
+Analyze this text and extract event information. Return ONLY a JSON object with this exact structure:
+{
+  "title": "event title",
+  "date": "YYYY-MM-DD",
+  "startTime": "HH:MM",
+  "endTime": "HH:MM",
+  "location": "location if found",
+  "description": "description if found",
+  "attendees": ["email1@example.com"],
+  "confidence": 0.95
+}
+
+If you cannot find specific information, use null for that field. Confidence should be between 0 and 1.
+For relative dates like "tomorrow", "next week", calculate the actual date.
+
+Text to analyze: ${text}
+`;
+
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const responseText = response.text();
+
+      // Parse JSON response
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No valid JSON found in response');
+      }
+
+      const extracted = JSON.parse(jsonMatch[0]);
+      
+      // Validate and return
+      const now = new Date().toISOString();
+      return {
+        id: `extracted_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        title: extracted.title || 'Untitled Event',
+        date: extracted.date || new Date().toISOString().split('T')[0],
+        time: extracted.startTime || '09:00',
+        startTime: extracted.startTime || '09:00',
+        endTime: extracted.endTime || '10:00',
+        location: extracted.location || undefined,
+        description: extracted.description || undefined,
+        attendees: Array.isArray(extracted.attendees) ? extracted.attendees : [],
+        confidence: Math.min(Math.max(extracted.confidence || 0.5, 0), 1),
+        status: 'draft' as const,
+        createdAt: now,
+        updatedAt: now
+      };
+
+    } catch (error) {
+      console.error('Gemini text extraction error:', error);
+      throw new Error('Failed to extract event information from text');
+    }
+  }
 }
 
 export const geminiService = new GeminiService();
