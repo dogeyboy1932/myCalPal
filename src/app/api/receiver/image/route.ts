@@ -6,6 +6,7 @@ import { authOptions } from '../../../../lib/auth';
 import sharp from 'sharp';
 import { broadcastToClients } from '../../websocket/route';
 import { broadcastToStream } from '../../stream/route';
+import { addRecentEvent } from '../../drafts/route';
 import { geminiService } from '../../../../lib/services/gemini';
 import { AIExtractionResult, UploadedFile } from '../../../../types';
 
@@ -39,15 +40,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (providedToken !== expectedToken) {
-      console.log("❌ [AUTH] Token mismatch - unauthorized request")
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    // if (providedToken !== expectedToken) {
+    //   console.log("❌ [AUTH] Token mismatch - unauthorized request")
+    //   return NextResponse.json(
+    //     { success: false, error: 'Unauthorized' },
+    //     { status: 401 }
+    //   );
+    // }
     
-    console.log("✅ [AUTH] Token validation successful")
+    // console.log("✅ [AUTH] Token validation successful")
 
     const formData = await request.formData();
     console.log("📋 [FORM] Form data keys:", Array.from(formData.keys()))
@@ -194,7 +195,12 @@ export async function POST(request: NextRequest) {
       
       console.log('📝 [EVENT] Created event object:', JSON.stringify(newEvent, null, 2));
       
-      // Broadcast the event via SSE for real-time updates
+      // Store the event in RECENT_EVENT array
+      console.log('📝 [RECEIVER] Adding event to RECENT_EVENT array');
+      addRecentEvent(newEvent);
+      console.log('📝 [STORE] Event added to recent events successfully');
+      
+      // Broadcast the event via SSE for real-time updates (for local development)
       console.log('📡 [BROADCAST] Broadcasting event_extracted to SSE clients...')
       broadcastToStream('event_extracted', newEvent);
       console.log('📡 [BROADCAST] event_extracted broadcast completed')

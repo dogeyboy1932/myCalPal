@@ -62,28 +62,64 @@ function HomeComponent() {
     localStorage.setItem('skipDrafts', JSON.stringify(skipDrafts));
   }, [skipDrafts]);
 
+  // Polling for recent events - only when authenticated
   useEffect(() => {
-    const evtSource = new EventSource("/api/stream");
-    evtSource.onmessage = (e) => {
-      console.log("Update from server:", e.data);
+    if (status === 'loading') return; // Wait for session to load
+    if (!session?.user?.email) {
+      console.log('🔒 No authenticated session, skipping polling');
+      return;
+    }
+
+    console.log('🔄 Starting polling for recent events for user:', session.user.email);
+    
+    const pollForUpdates = async () => {
       try {
-        const data = JSON.parse(e.data);
-        if (data.type === 'event_extracted') {
-          const newEvent: ExtractedEvent = {
-            ...data.data,
-            status: 'draft' as const,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          };
-          setEventDrafts(prev => [newEvent, ...prev]);
-          setActiveTab('drafts');
+        console.log('🔄 [POLLING] Checking for new events...');
+        const response = await fetch('/api/drafts');
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('📥 [POLLING] Received data:', data);
+          
+          if (data.events && data.events.length > 0) {
+            console.log('📝 [POLLING] Found', data.events.length, 'recent events');
+            
+            // Add new events to the existing drafts
+            setEventDrafts(prevDrafts => {
+              const newEvents = data.events.filter((newEvent: any) => 
+                !prevDrafts.some(existingDraft => existingDraft.id === newEvent.id)
+              );
+              
+              if (newEvents.length > 0) {
+                console.log('✨ [POLLING] Adding', newEvents.length, 'new events as drafts');
+                setActiveTab('drafts'); // Switch to drafts tab
+                return [...newEvents, ...prevDrafts];
+              }
+              
+              return prevDrafts;
+            });
+          } else {
+            console.log('📝 [POLLING] No recent events found');
+          }
+        } else {
+          console.error('❌ [POLLING] Failed to fetch recent events:', response.status);
         }
       } catch (error) {
-        console.error('Error parsing SSE data:', error);
+        console.error('❌ [POLLING] Error during polling:', error);
       }
     };
-    return () => evtSource.close();
-  }, []);
+    
+    // Initial poll
+    pollForUpdates();
+    
+    // Set up polling interval (every 1 minute)
+     const pollInterval = setInterval(pollForUpdates, 60000);
+    
+    return () => {
+      console.log('🔄 Stopping polling interval');
+      clearInterval(pollInterval);
+    };
+  }, [session, status]);
 
   const handleImageUpload = async (file: File) => {
     setIsUploading(true);
@@ -214,7 +250,7 @@ function HomeComponent() {
         );
         
         // Show success message or redirect
-        alert('Event successfully added to your calendar!');
+        // alert('Event successfully added to your calendar!');
       } else {
         throw new Error(result.error || 'Failed to publish event');
       }
@@ -439,17 +475,57 @@ function HomeComponent() {
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium text-gray-900">Event Drafts</h2>
-                {/* <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4">
                   <button
-                    onClick={handleTestCalendarCreate}
-                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm"
+                    onClick={async () => {
+                      alert('Button clicked! Check console for logs.');
+                      console.log('🔄 Manual refresh triggered');
+                      console.log('Button click handler executed successfully');
+                      try {
+                        console.log('📡 Fetching from /api/drafts...');
+                        const response = await fetch('/api/drafts');
+                        
+                        console.log('📊 Response status:', response.status);
+                        console.log('📊 Response ok:', response.ok);
+                        console.log('📊 Response headers:', Object.fromEntries(response.headers.entries()));
+
+                        if (response.ok) {
+                          const data = await response.json();
+                          console.log('📥 Manual refresh data:', data);
+                          console.log('📥 Events count:', data.events ? data.events.length : 'No events property');
+                          
+                          if (data.events && data.events.length > 0) {
+                            setEventDrafts(prevDrafts => {
+                              const newEvents = data.events.filter((newEvent: any) => 
+                                !prevDrafts.some(existingDraft => existingDraft.id === newEvent.id)
+                              );
+                              if (newEvents.length > 0) {
+                                console.log('✨ Manual refresh: Adding', newEvents.length, 'new events');
+                                return [...newEvents, ...prevDrafts];
+                              }
+                              console.log('ℹ️ No new events to add');
+                              return prevDrafts;
+                            });
+                          } else {
+                            console.log('ℹ️ No events in response or empty events array');
+                          }
+                        } else {
+                          const errorText = await response.text();
+                          console.error('❌ API Error - Status:', response.status, 'Response:', errorText);
+                        }
+                      } catch (error) {
+                        console.error('❌ Manual refresh error:', error);
+                        console.error('❌ Error details:', error instanceof Error ? error.message : 'Unknown error');
+                      }
+                    }}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm flex items-center gap-2"
                   >
-                    🧪 Test Calendar Create
+                    🔄 Refresh
                   </button>
                   <span className="text-sm text-gray-500">
                     {eventDrafts.length} {eventDrafts.length === 1 ? 'draft' : 'drafts'}
                   </span>
-                </div> */}
+                </div>
               </div>
               
               {eventDrafts.length === 0 ? (
