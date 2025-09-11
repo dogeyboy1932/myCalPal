@@ -6,6 +6,7 @@ import { useSession, signIn, signOut } from 'next-auth/react';
 import { useState, useEffect } from 'react';
 import ImageUpload from '../components/ImageUpload';
 import EventDraft from '../components/EventDraft';
+import EventListener from '../components/EventListener';
 import { ExtractedEvent } from '../types';
 
 // Make this component dynamic to avoid SSR issues
@@ -61,70 +62,27 @@ function HomeComponent() {
     localStorage.setItem('skipDrafts', JSON.stringify(skipDrafts));
   }, [skipDrafts]);
 
-  // Server-Sent Events connection for real-time updates
   useEffect(() => {
-    let eventSource: EventSource | null = null;
-    
-    const connectSSE = () => {
+    const evtSource = new EventSource("/api/stream");
+    evtSource.onmessage = (e) => {
+      console.log("Update from server:", e.data);
       try {
-        eventSource = new EventSource('/api/websocket');
-        
-        eventSource.onopen = () => {
-          console.log('🔌 SSE connected');
-          setWsConnected(true);
-        };
-        
-        eventSource.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            console.log('📨 SSE message received:', data);
-            
-            if (data.type === 'event_extracted' && data.event) {
-              // Add the extracted event to drafts
-              const newEvent: ExtractedEvent = {
-                ...data.event,
-                id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                status: 'draft' as const,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-              };
-              
-              setEventDrafts(prev => [...prev, newEvent]);
-              setActiveTab('drafts'); // Switch to drafts tab to show the new event
-              
-              // Show notification
-              console.log('✅ New event received via SSE:', newEvent.title);
-            }
-            
-            if (data.type === 'draft_created') {
-              console.log('📝 Draft created notification:', data.message);
-            }
-          } catch (error) {
-            console.error('Failed to parse SSE message:', error);
-          }
-        };
-        
-        eventSource.onerror = (error) => {
-          console.error('SSE error:', error);
-          setWsConnected(false);
-          eventSource?.close();
-          
-          // Attempt to reconnect after 3 seconds
-          setTimeout(connectSSE, 3000);
-        };
+        const data = JSON.parse(e.data);
+        if (data.type === 'event_extracted') {
+          const newEvent: ExtractedEvent = {
+            ...data.data,
+            status: 'draft' as const,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+          setEventDrafts(prev => [newEvent, ...prev]);
+          setActiveTab('drafts');
+        }
       } catch (error) {
-        console.error('Failed to connect SSE:', error);
-        setTimeout(connectSSE, 3000);
+        console.error('Error parsing SSE data:', error);
       }
     };
-    
-    connectSSE();
-    
-    return () => {
-      if (eventSource) {
-        eventSource.close();
-      }
-    };
+    return () => evtSource.close();
   }, []);
 
   const handleImageUpload = async (file: File) => {
@@ -137,7 +95,7 @@ function HomeComponent() {
 
       console.log("UPLOADING 1")
 
-      const response = await fetch('/api/upload', {
+      const response = await fetch('/api/receiver/image', {
         method: 'POST',
         body: formData,
       });
@@ -468,6 +426,11 @@ function HomeComponent() {
               onUpload={handleImageUpload}
               isProcessing={isUploading}
             />
+            
+            {/* Real-time Event Updates */}
+            <div className="mt-6">
+              <EventListener />
+            </div>
           </div>
         )}
 

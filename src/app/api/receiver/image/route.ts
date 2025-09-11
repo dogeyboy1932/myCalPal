@@ -1,13 +1,13 @@
-// Image receiver endpoint for bot integrations (e.g., Discord)
+// Unified image receiver endpoint for bot integrations and web uploads with SSE
 
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../../../../lib/auth';
 import sharp from 'sharp';
-// import mongoose from 'mongoose';
-// import { connectToDatabase } from '../../../../lib/mongodb';
-// import { EventDraft } from '../../../../models';
 import { broadcastToClients } from '../../websocket/route';
+import { broadcastToStream } from '../../stream/route';
 import { geminiService } from '../../../../lib/services/gemini';
-import { AIExtractionResult } from '../../../../types';
+import { AIExtractionResult, UploadedFile } from '../../../../types';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
@@ -18,15 +18,7 @@ function getReceiverToken() {
 
 
 
-// function getDefaultUserId(): mongoose.Types.ObjectId {
-//   const envId = process.env.RECEIVER_DEFAULT_USER_ID;
-//   if (envId && mongoose.Types.ObjectId.isValid(envId)) {
-//     return new mongoose.Types.ObjectId(envId);
-//   }
-//   // Fallback: generate a placeholder ObjectId (draft may not show for any real user)
-//   return new mongoose.Types.ObjectId();
-// }
-
+// Handle image uploads from both bots and web clients
 export async function POST(request: NextRequest) {
   console.log("REACHED HERE")
   try {
@@ -122,9 +114,9 @@ export async function POST(request: NextRequest) {
     
     try {
       extractedData = await geminiService.extractEventFromImage(processedBuffer, file.type);
-      console.log('=== EXTRACTED DATA JSON ===');
-      console.log(JSON.stringify(extractedData, null, 2));
-      console.log('=== END EXTRACTED DATA ===');
+      // console.log('=== EXTRACTED DATA JSON ===');
+      // console.log(JSON.stringify(extractedData, null, 2));
+      // console.log('=== END EXTRACTED DATA ===');
     } catch (error) {
       console.error('❌ Gemini extraction failed:', error);
       return NextResponse.json({
@@ -148,7 +140,7 @@ export async function POST(request: NextRequest) {
       completedAt: new Date()
     };
     
-    console.log('✅ Direct extraction completed:', extractResult);
+    // console.log('✅ Direct extraction completed:', extractResult);
     
     if (extractResult.status === 'completed' && extractedData) {
       // Create ExtractedEvent object like the frontend does
@@ -169,7 +161,10 @@ export async function POST(request: NextRequest) {
         updatedAt: new Date().toISOString()
       };
       
-      console.log('📝 Created event object:', newEvent);
+      // console.log('📝 Created event object:', newEvent);
+      
+      // Broadcast the event via SSE for real-time updates
+      broadcastToStream('event_extracted', newEvent);
       
       // Database operations commented out for now - focusing on drafting functionality
       // try {
