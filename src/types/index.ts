@@ -5,9 +5,8 @@ export interface ExtractedEvent {
   id: string;
   title: string;
   date: string; // YYYY-MM-DD
-  time: string; // HH:MM
-  startTime?: string;
-  endTime?: string;
+  startTime: string; // HH:MM
+  endTime: string; // HH:MM
   location?: string;
   description?: string;
   attendees?: string[];

@@ -137,7 +137,8 @@ function HomeComponent() {
       id: `test_${Date.now()}`,
       title: 'Test Meeting',
       date: '2024-01-15',
-      time: '14:00',
+      startTime: '14:00',
+      endTime: '15:00',
       location: 'Conference Room A',
       description: 'Test event for debugging calendar creation',
       attendees: [],
@@ -156,9 +157,10 @@ function HomeComponent() {
       // Convert date and time to proper startTime and endTime (preserve original date)
       // Parse date and time components to avoid timezone conversion
       const [year, month, day] = event.date.split('-').map(Number);
-      const [hours, minutes] = event.time.split(':').map(Number);
-      const startDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
-      const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000); // Add 1 hour
+      const [startHours, startMinutes] = event.startTime.split(':').map(Number);
+      const [endHours, endMinutes] = event.endTime.split(':').map(Number);
+      const startDateTime = new Date(year, month - 1, day, startHours, startMinutes, 0, 0);
+      const endDateTime = new Date(year, month - 1, day, endHours, endMinutes, 0, 0);
       
       const response = await fetch('/api/calendar/create', {
         method: 'POST',
@@ -419,7 +421,12 @@ function HomeComponent() {
                       console.log('Button click handler executed successfully');
                       try {
                         console.log('📡 Fetching from /api/drafts...');
-                        const response = await fetch('/api/drafts');
+                        const response = await fetch('/api/drafts', {
+                          credentials: 'include',
+                          headers: {
+                            'Content-Type': 'application/json'
+                          }
+                        });
                         
                         console.log('📊 Response status:', response.status);
                         console.log('📊 Response ok:', response.ok);

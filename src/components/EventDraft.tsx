@@ -129,7 +129,7 @@ export default function EventDraft({ event, onSave, onDelete, onPublish }: Event
           <h3 className="text-xl font-semibold">{event.title}</h3>
           <div className="text-gray-600">
             <p><strong>Date:</strong> {formatDate(event.date)}</p>
-            <p><strong>Time:</strong> {event.startTime ? formatTime(event.startTime) : event.time} - {event.endTime ? formatTime(event.endTime) : 'End time not specified'}</p>
+            <p><strong>Time:</strong> {formatTime(event.startTime)} - {formatTime(event.endTime)}</p>
             {event.location && <p><strong>Location:</strong> {event.location}</p>}
             {event.description && <p><strong>Description:</strong> {event.description}</p>}
           </div>
