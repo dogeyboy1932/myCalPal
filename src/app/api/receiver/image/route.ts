@@ -28,30 +28,34 @@ export async function POST(request: NextRequest) {
   console.log("🚀 [RECEIVER] Request headers:", Object.fromEntries(request.headers.entries()))
   
   try {
-    // Simple token-based auth via header to allow non-user clients (Discord bot) to call this endpoint
+    // Determine authentication method and user ID
     const providedToken = request.headers.get('x-receiver-token') || '';
     const expectedToken = getReceiverToken();
+    let userId: string;
+    let isTokenAuth = false;
     
     console.log("🔐 [AUTH] Provided token length:", providedToken.length)
     console.log("🔐 [AUTH] Expected token configured:", !!expectedToken)
 
-    if (!expectedToken) {
-      console.log("❌ [AUTH] No receiver token configured on server")
+    // Check for session-based authentication first (web uploads)
+    const session = await getServerSession(authOptions);
+    
+    if (session?.user?.email) {
+      // Web upload with authenticated user
+      userId = session.user.email;
+      console.log("✅ [AUTH] Session-based authentication successful for user:", userId)
+    } else if (providedToken && expectedToken && providedToken === expectedToken) {
+      // Token-based authentication (Discord bot)
+      isTokenAuth = true;
+      userId = 'discord-bot'; // Keep Discord bot events separate but identifiable
+      console.log("✅ [AUTH] Token-based authentication successful")
+    } else {
+      console.log("❌ [AUTH] No valid authentication found")
       return NextResponse.json(
-        { success: false, error: 'Receiver token is not configured on the server' },
-        { status: 500 }
+        { success: false, error: 'Unauthorized - please sign in or provide valid token' },
+        { status: 401 }
       );
     }
-
-    // if (providedToken !== expectedToken) {
-    //   console.log("❌ [AUTH] Token mismatch - unauthorized request")
-    //   return NextResponse.json(
-    //     { success: false, error: 'Unauthorized' },
-    //     { status: 401 }
-    //   );
-    // }
-    
-    // console.log("✅ [AUTH] Token validation successful")
 
     const formData = await request.formData();
     console.log("📋 [FORM] Form data keys:", Array.from(formData.keys()))
@@ -102,7 +106,7 @@ export async function POST(request: NextRequest) {
           category: extractedData.category,
           confidence: extractedData.confidence,
           status: 'draft' as const,
-          userId: 'discord-bot'
+          userId: userId
         };
 
         console.log('📝 [RECEIVER] Saving text-extracted event to MongoDB');
@@ -112,7 +116,7 @@ export async function POST(request: NextRequest) {
           
           const savedEvent = await Event.create({
             ...newEvent,
-            userId: 'discord-bot',
+            userId: userId,
             createdAt: new Date(),
             updatedAt: new Date()
           });
@@ -279,7 +283,7 @@ export async function POST(request: NextRequest) {
         
         const savedEvent = await Event.create({
           ...newEvent,
-          userId: 'discord-bot', // Discord bot events
+          userId: userId,
           createdAt: new Date(),
           updatedAt: new Date()
         });

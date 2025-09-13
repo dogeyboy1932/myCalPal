@@ -71,13 +71,9 @@ export async function GET(request: NextRequest) {
     
     await connectToDatabase();
     
-    // Query for both user's events and Discord bot events
+    // Query for only the authenticated user's events
     const query = {
-      $or: [
-        { userId: session.user?.email || '' },
-        { userId: 'discord-bot' },
-        { userId: 'receiver@internal' }
-      ],
+      userId: session.user?.email || '',
       status: status 
     };
     console.log(`📊 MongoDB Query:`, JSON.stringify(query, null, 2));
@@ -91,13 +87,9 @@ export async function GET(request: NextRequest) {
     console.log(`  - Found ${events.length} events with status '${status}'`);
     console.log(`  - Events data:`, JSON.stringify(events, null, 2));
     
-    // Also check total count in database for this user (including Discord bot events)
+    // Also check total count in database for this user
     const userQuery = {
-      $or: [
-        { userId: session.user?.email || '' },
-        { userId: 'discord-bot' },
-        { userId: 'receiver@internal' }
-      ]
+      userId: session.user?.email || ''
     };
     const totalCount = await Event.countDocuments(userQuery);
     const draftCount = await Event.countDocuments({ ...userQuery, status: 'draft' });
