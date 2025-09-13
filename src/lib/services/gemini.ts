@@ -70,7 +70,7 @@ If you cannot find specific information, use null for that field. Confidence sho
       return {
         id: `extracted_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         title: extracted.title || 'Untitled Event',
-        date: extracted.date || new Date().toISOString().split('T')[0],
+        date: extracted.date || new Date().toLocaleDateString('en-CA'), // en-CA gives YYYY-MM-DD format
         startTime: startTime,
         endTime: endTime,
         location: extracted.location || undefined,
@@ -138,7 +138,7 @@ Text to analyze: ${text}
       return {
         id: `extracted_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         title: extracted.title || 'Untitled Event',
-        date: extracted.date || new Date().toISOString().split('T')[0],
+        date: extracted.date || new Date().toLocaleDateString('en-CA'), // en-CA gives YYYY-MM-DD format
         startTime: startTime,
         endTime: endTime,
         location: extracted.location || undefined,

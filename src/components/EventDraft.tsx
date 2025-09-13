@@ -32,7 +32,11 @@ export default function EventDraft({ event, onSave, onDelete, onPublish }: Event
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+    // console.log("HERE")
+    // console.log(dateString)
+    // Parse date string directly to avoid timezone conversion issues
+    const [year, month, day] = dateString.split('-');
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day)).toLocaleDateString();
   };
 
   const formatTime = (timeString: string) => {
