@@ -32,44 +32,13 @@ function HomeComponent() {
   const [hasLoadedDraftsFromDB, setHasLoadedDraftsFromDB] = useState(false);
   // Removed wsConnected state - no longer using WebSocket
 
-  // Load drafts and settings from localStorage on component mount
+  // Load drafts from database on component mount
   useEffect(() => {
-    const savedDrafts = localStorage.getItem('eventDrafts');
-    if (savedDrafts) {
-      try {
-        setEventDrafts(JSON.parse(savedDrafts));
-      } catch (error) {
-        console.error('Failed to load saved drafts:', error);
-      }
-    }
-    
-    const savedSkipDrafts = localStorage.getItem('skipDrafts');
-    if (savedSkipDrafts) {
-      try {
-        setSkipDrafts(JSON.parse(savedSkipDrafts));
-      } catch (error) {
-        console.error('Failed to load skip drafts setting:', error);
-      }
-    }
-  }, []);
-
-  // Save drafts to localStorage whenever drafts change
-  useEffect(() => {
-    localStorage.setItem('eventDrafts', JSON.stringify(eventDrafts));
-  }, [eventDrafts]);
-
-  // Save skipDrafts setting to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem('skipDrafts', JSON.stringify(skipDrafts));
-  }, [skipDrafts]);
-
-  // Automatically load drafts from MongoDB when drafts tab is first accessed
-  useEffect(() => {
-    if (activeTab === 'drafts' && !hasLoadedDraftsFromDB && session) {
-      console.log('🔄 Auto-loading drafts from MongoDB on first access');
+    if (session) {
+      console.log('🔄 Loading drafts from database on component mount');
       const loadDraftsFromDB = async () => {
         try {
-          console.log('📡 Auto-fetching from /api/drafts...');
+          console.log('📡 Fetching from /api/drafts...');
           const response = await fetch('/api/drafts', {
             credentials: 'include',
             headers: {
@@ -77,35 +46,27 @@ function HomeComponent() {
             }
           });
           
-          console.log('📊 Auto-load response status:', response.status);
+          console.log('📊 Response status:', response.status);
           
           if (response.ok) {
             const data = await response.json();
-            console.log('📥 Auto-load data:', data);
-            console.log('📥 Auto-load events count:', data.events ? data.events.length : 'No events property');
+            console.log('📥 Data:', data);
+            console.log('📥 Events count:', data.events ? data.events.length : 'No events property');
             
             if (data.events && data.events.length > 0) {
-              setEventDrafts(prevDrafts => {
-                const newEvents = data.events.filter((newEvent: any) => 
-                  !prevDrafts.some(existingDraft => existingDraft.id === newEvent.id)
-                );
-                if (newEvents.length > 0) {
-                  console.log('✨ Auto-load: Adding', newEvents.length, 'new events');
-                  return [...newEvents, ...prevDrafts];
-                }
-                console.log('ℹ️ Auto-load: No new events to add');
-                return prevDrafts;
-              });
+              setEventDrafts(data.events);
+              console.log('✨ Loaded', data.events.length, 'drafts from database');
             } else {
-              console.log('ℹ️ Auto-load: No events in response or empty events array');
+              console.log('ℹ️ No events in response or empty events array');
+              setEventDrafts([]);
             }
           } else {
             const errorText = await response.text();
-            console.error('❌ Auto-load API Error - Status:', response.status, 'Response:', errorText);
+            console.error('❌ API Error - Status:', response.status, 'Response:', errorText);
           }
         } catch (error) {
-          console.error('❌ Auto-load error:', error);
-          console.error('❌ Auto-load error details:', error instanceof Error ? error.message : 'Unknown error');
+          console.error('❌ Load error:', error);
+          console.error('❌ Load error details:', error instanceof Error ? error.message : 'Unknown error');
         } finally {
           setHasLoadedDraftsFromDB(true);
         }
@@ -113,7 +74,11 @@ function HomeComponent() {
       
       loadDraftsFromDB();
     }
-  }, [activeTab, hasLoadedDraftsFromDB, session]);
+  }, [session]);
+
+  // Drafts are now saved to database via API calls, no localStorage needed
+
+  // Drafts are now loaded on component mount, no need for tab-specific loading
 
   // Removed automatic polling - using manual refresh only
 
