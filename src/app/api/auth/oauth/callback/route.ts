@@ -107,13 +107,29 @@ export async function GET(request: NextRequest) {
 
     console.log(`✅ [OAUTH-CALLBACK] Authenticated email: ${userInfo.email} for Discord user: ${session.discordId}`);
 
-    // Register or update Discord user with verified email
-    const registeredUser = await DiscordUser.registerUser(
-      session.discordId,
-      userInfo.email,
-      session.discordUsername
-    );
+    // Register or update Discord user with verified email using internal API
+    const registerResponse = await fetch(`${request.nextUrl.origin}/api/discord/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        discordId: session.discordId,
+        email: userInfo.email,
+        username: session.discordUsername
+      })
+    });
 
+    const registerResult = await registerResponse.json();
+    
+    if (!registerResponse.ok || !registerResult.success) {
+      console.error(`❌ [OAUTH-CALLBACK] Failed to register user:`, registerResult.error);
+      return NextResponse.redirect(
+        new URL('/auth/error?error=registration_failed', request.url)
+      );
+    }
+
+    const registeredUser = registerResult.user;
     console.log(`🎉 [OAUTH-CALLBACK] Successfully registered Discord user ${session.discordId} with email ${userInfo.email}`);
 
      // Send success notification to Discord user
