@@ -24,7 +24,7 @@ const DynamicHome = dynamic(() => Promise.resolve(HomeComponent), {
 
 function HomeComponent() {
   const { data: session, status } = useSession();
-  const [activeTab, setActiveTab] = useState('upload');
+  const [activeTab, setActiveTab] = useState('drafts');
   const [isUploading, setIsUploading] = useState(false);
   const [eventDrafts, setEventDrafts] = useState<ExtractedEvent[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -355,8 +355,8 @@ function HomeComponent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex space-x-8">
             {[
-              { id: 'upload', label: 'Upload Image', icon: '📷' },
               { id: 'drafts', label: 'Event Drafts', icon: '📝' },
+              { id: 'upload', label: 'Upload Image', icon: '📷' },
               { id: 'calendar', label: 'Calendar', icon: '📅' },
               { id: 'settings', label: 'Settings', icon: '⚙️' }
             ].map((tab) => (
