@@ -78,7 +78,7 @@ export default function EventDraft({ event, onSave, onDelete, onPublish }: Event
             className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
           />
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <input
               type="date"
               value={editedEvent.date}
@@ -89,6 +89,14 @@ export default function EventDraft({ event, onSave, onDelete, onPublish }: Event
               type="time"
               value={editedEvent.startTime || ''}
               onChange={(e) => setEditedEvent({ ...editedEvent, startTime: e.target.value })}
+              placeholder="Start time"
+              className="border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+            />
+            <input
+              type="time"
+              value={editedEvent.endTime || ''}
+              onChange={(e) => setEditedEvent({ ...editedEvent, endTime: e.target.value })}
+              placeholder="End time"
               className="border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
             />
           </div>

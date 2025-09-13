@@ -183,11 +183,22 @@ function HomeComponent() {
 
   const handlePublishEvent = async (event: ExtractedEvent, calendarId?: string) => {
     try {
+      // Validate and ensure proper end time
+      let endTime = event.endTime;
+      if (!endTime || endTime === '10:00') {
+        // Infer end time as 1 hour after start time
+        const [startHours, startMinutes] = event.startTime.split(':').map(Number);
+        const inferredEndHours = startHours + 1;
+        const endMinutesStr = startMinutes.toString().padStart(2, '0');
+        const endHoursStr = (inferredEndHours % 24).toString().padStart(2, '0');
+        endTime = `${endHoursStr}:${endMinutesStr}`;
+      }
+      
       // Convert date and time to proper startTime and endTime (preserve original date)
       // Parse date and time components to avoid timezone conversion
       const [year, month, day] = event.date.split('-').map(Number);
       const [startHours, startMinutes] = event.startTime.split(':').map(Number);
-      const [endHours, endMinutes] = event.endTime.split(':').map(Number);
+      const [endHours, endMinutes] = endTime.split(':').map(Number);
       const startDateTime = new Date(year, month - 1, day, startHours, startMinutes, 0, 0);
       const endDateTime = new Date(year, month - 1, day, endHours, endMinutes, 0, 0);
       

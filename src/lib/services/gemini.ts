@@ -53,14 +53,26 @@ If you cannot find specific information, use null for that field. Confidence sho
 
       const extracted = JSON.parse(jsonMatch[0]);
       
-      // Validate and return
+      // Validate and return with proper end time inference
       const now = new Date().toISOString();
+      const startTime = extracted.startTime || '09:00';
+      let endTime = extracted.endTime;
+      
+      // If no end time provided, infer it as 1 hour after start time
+      if (!endTime) {
+        const [startHours, startMinutes] = startTime.split(':').map(Number);
+        const endHours = startHours + 1;
+        const endMinutesStr = startMinutes.toString().padStart(2, '0');
+        const endHoursStr = (endHours % 24).toString().padStart(2, '0');
+        endTime = `${endHoursStr}:${endMinutesStr}`;
+      }
+      
       return {
         id: `extracted_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         title: extracted.title || 'Untitled Event',
         date: extracted.date || new Date().toISOString().split('T')[0],
-        startTime: extracted.startTime || '09:00',
-        endTime: extracted.endTime || '10:00',
+        startTime: startTime,
+        endTime: endTime,
         location: extracted.location || undefined,
         description: extracted.description || undefined,
         attendees: Array.isArray(extracted.attendees) ? extracted.attendees : [],
@@ -109,14 +121,26 @@ Text to analyze: ${text}
 
       const extracted = JSON.parse(jsonMatch[0]);
       
-      // Validate and return
+      // Validate and return with proper end time inference
       const now = new Date().toISOString();
+      const startTime = extracted.startTime || '09:00';
+      let endTime = extracted.endTime;
+      
+      // If no end time provided, infer it as 1 hour after start time
+      if (!endTime) {
+        const [startHours, startMinutes] = startTime.split(':').map(Number);
+        const endHours = startHours + 1;
+        const endMinutesStr = startMinutes.toString().padStart(2, '0');
+        const endHoursStr = (endHours % 24).toString().padStart(2, '0');
+        endTime = `${endHoursStr}:${endMinutesStr}`;
+      }
+      
       return {
         id: `extracted_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         title: extracted.title || 'Untitled Event',
         date: extracted.date || new Date().toISOString().split('T')[0],
-        startTime: extracted.startTime || '09:00',
-        endTime: extracted.endTime || '10:00',
+        startTime: startTime,
+        endTime: endTime,
         location: extracted.location || undefined,
         description: extracted.description || undefined,
         attendees: Array.isArray(extracted.attendees) ? extracted.attendees : [],
