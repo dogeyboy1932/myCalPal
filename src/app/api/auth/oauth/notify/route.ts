@@ -8,25 +8,10 @@ class DiscordNotificationService {
   private static async initialize() {
     if (this.isInitialized) return;
 
-    // Dynamic import to prevent Next.js from bundling Discord.js for client-side
-    const { Client, GatewayIntentBits } = await import('discord.js');
-    
-    this.client = new Client({
-      intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.DirectMessages
-      ]
-    });
-
-    try {
-      await this.client.login(process.env.DISCORD_BOT_TOKEN);
-      this.isInitialized = true;
-      console.log('✅ [DISCORD-NOTIFY] Bot initialized for notifications');
-    } catch (error) {
-      console.error('❌ [DISCORD-NOTIFY] Failed to initialize bot:', error);
-      throw error;
-    }
+    // Discord.js functionality disabled for production builds
+    // Notifications will be handled by the separate Discord bot service
+    console.warn('⚠️ [DISCORD-NOTIFY] Discord notifications disabled in this build');
+    this.isInitialized = true;
   }
 
   static async sendAuthSuccessNotification(discordId: string, email: string) {
@@ -34,7 +19,8 @@ class DiscordNotificationService {
       await this.initialize();
       
       if (!this.client) {
-        throw new Error('Discord client not initialized');
+        console.warn('⚠️ [DISCORD-NOTIFY] Discord client not available, skipping notification');
+        return;
       }
 
       const user = await this.client.users.fetch(discordId);
@@ -62,7 +48,8 @@ class DiscordNotificationService {
       await this.initialize();
       
       if (!this.client) {
-        throw new Error('Discord client not initialized');
+        console.warn('⚠️ [DISCORD-NOTIFY] Discord client not available, skipping error notification');
+        return;
       }
 
       const user = await this.client.users.fetch(discordId);

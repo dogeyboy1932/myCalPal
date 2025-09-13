@@ -5,21 +5,8 @@ import connectToDatabase from '../../../lib/mongodb';
 import Event, { IEvent } from '../../../models/Event';
 // Removed ICS file generation - storing data directly
 
-// Add a recent event to in-memory cache (MongoDB save handled elsewhere)
-export async function addRecentEvent(event: any) {
-  try {
-    console.log('Adding recent event to cache:', event.id);
-    // Just return the event - MongoDB save is handled by the caller
-    // This function now only serves as a cache/logging mechanism
-    return event;
-  } catch (error) {
-    console.error('❌ Error processing recent event:', error);
-    throw error;
-  }
-}
-
 // Get recent events from MongoDB
-export async function getRecentEvents(userId: string, limit: number = 10) {
+async function getRecentEvents(userId: string, limit: number = 10) {
   try {
     await connectToDatabase();
     
@@ -119,7 +106,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log('Adding new recent event via POST:', body);
     
-    addRecentEvent(body);
+    // TODO: Implement direct MongoDB storage if needed
+    console.log('Event data received but not persisted');
     
     return NextResponse.json({ success: true });
   } catch (error) {

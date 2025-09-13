@@ -5,8 +5,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../../lib/auth';
 import sharp from 'sharp';
 import { randomUUID } from 'crypto';
-// Removed broadcast imports - using RECENT_EVENT array only
-import { addRecentEvent } from '../../drafts/route';
+// Removed broadcast imports - using direct MongoDB storage only
 // MongoDB imports for direct storage
 import connectToDatabase from '../../../../lib/mongodb';
 import Event from '../../../../models/Event';
@@ -138,9 +137,6 @@ export async function POST(request: NextRequest) {
           
           console.log('✅ Text event saved to MongoDB:', savedEvent._id);
           
-          // Also add to RECENT_EVENT array for immediate access
-          await addRecentEvent(newEvent);
-          
           return NextResponse.json({
             success: true,
             message: 'Text processed and event draft created',
@@ -149,8 +145,6 @@ export async function POST(request: NextRequest) {
           
         } catch (dbError) {
           console.error('❌ MongoDB save failed:', dbError);
-          // Still add to RECENT_EVENT array as fallback
-          await addRecentEvent(newEvent);
           
           return NextResponse.json({
             success: true,
@@ -308,13 +302,10 @@ export async function POST(request: NextRequest) {
         
         console.log('✅ Event saved to MongoDB:', savedEvent._id);
         
-        // Also add to RECENT_EVENT array for immediate access
-        await addRecentEvent(newEvent);
+        // Event saved to MongoDB successfully
         
       } catch (dbError) {
         console.error('❌ MongoDB save failed:', dbError);
-        // Still add to RECENT_EVENT array as fallback
-        await addRecentEvent(newEvent);
       }
       
       // Event stored in RECENT_EVENT array - accessible via /api/drafts endpoint
