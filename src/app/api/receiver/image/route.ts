@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     } else if (providedToken && expectedToken && providedToken === expectedToken) {
       // Token-based authentication (Discord bot)
       isTokenAuth = true;
-      userId = 'discord-bot'; // Keep Discord bot events separate but identifiable
+      userId = 'discord-bot'; // Will be updated after reading form data
       console.log("✅ [AUTH] Token-based authentication successful")
     } else {
       console.log("❌ [AUTH] No valid authentication found")
@@ -59,6 +59,21 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData();
     console.log("📋 [FORM] Form data keys:", Array.from(formData.keys()))
+    
+    // For Discord bot, check if user email is provided
+    if (isTokenAuth) {
+      const userEmail = (formData.get('userEmail') as string) || '';
+      if (userEmail) {
+        userId = userEmail;
+        console.log("✅ [AUTH] Discord bot with registered user:", userId)
+      } else {
+        console.error("⚠️ [AUTH] Discord bot with unregistered user")
+        return NextResponse.json(
+          { success: false, error: 'Unauthorized - please sign in or provide valid token' },
+          { status: 401 }
+        );
+      }
+    }
 
     // Text-only payload support
     const text = (formData.get('text') as string) || '';
@@ -92,8 +107,8 @@ export async function POST(request: NextRequest) {
         }, { status: 500 });
       }
 
-      // Create event if extraction was successful
-      if (extractedData && extractedData.title) {
+      // Create event if extraction was successful and valid
+      if (extractedData && extractedData.title && extractedData.confidence >= 0.3 && userId !== 'discord-bot') {
         const newEvent = {
           id: `event_${randomUUID()}`,
           title: extractedData.title,
@@ -143,6 +158,9 @@ export async function POST(request: NextRequest) {
             event: newEvent
           });
         }
+      } else {
+        console.log('⚠️ [VALIDATION] Event not saved - invalid data, low confidence, or discord-bot user');
+        console.log('⚠️ [VALIDATION] Title:', !!extractedData?.title, 'Confidence:', extractedData?.confidence, 'UserId:', userId);
       }
 
       // If no event extracted, return text data only
@@ -250,7 +268,7 @@ export async function POST(request: NextRequest) {
     
     console.log('✅ [EXTRACT] Direct extraction completed:', extractResult.status, 'confidence:', extractResult.confidence);
     
-    if (extractResult.status === 'completed' && extractedData) {
+    if (extractResult.status === 'completed' && extractedData && extractedData.confidence >= 0.3 && userId !== 'discord-bot') {
       console.log('📝 [EVENT] Creating event object from extracted data...')
       // Store the event in MongoDB for drafting
       const newEvent = {
@@ -306,6 +324,15 @@ export async function POST(request: NextRequest) {
         success: true,
         message: 'Image processed and event draft created (no database persistence)',
         event: newEvent,
+        extractionResult: extractResult
+      });
+    } else if (extractResult.status === 'completed' && extractedData) {
+      console.log('⚠️ [VALIDATION] Event not saved - low confidence or discord-bot user');
+      console.log('⚠️ [VALIDATION] Confidence:', extractedData.confidence, 'UserId:', userId);
+      
+      return NextResponse.json({
+        success: true,
+        message: 'Image processed but event not saved due to low confidence or invalid user',
         extractionResult: extractResult
       });
     }

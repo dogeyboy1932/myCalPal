@@ -32,13 +32,27 @@ function HomeComponent() {
   const [hasLoadedDraftsFromDB, setHasLoadedDraftsFromDB] = useState(false);
   // Removed wsConnected state - no longer using WebSocket
 
-  // Load drafts from database on component mount
+  // No localStorage usage - removed to prevent data persistence issues
+
+  // Removed localStorage persistence to prevent data issues
+
+  // Clear drafts when user signs out
   useEffect(() => {
-    if (session) {
-      console.log('🔄 Loading drafts from database on component mount');
+    if (status === 'unauthenticated') {
+      console.log('🗑️ User signed out - clearing local drafts state');
+      setEventDrafts([]);
+      setHasLoadedDraftsFromDB(false);
+      setActiveTab('drafts'); // Reset to upload tab
+    }
+  }, [status]);
+
+  // Automatically load drafts from MongoDB when drafts tab is first accessed
+  useEffect(() => {
+    if (activeTab === 'drafts' && !hasLoadedDraftsFromDB && session) {
+      console.log('🔄 Auto-loading drafts from MongoDB on first access');
       const loadDraftsFromDB = async () => {
         try {
-          console.log('📡 Fetching from /api/drafts...');
+          console.log('📡 Auto-fetching from /api/drafts...');
           const response = await fetch('/api/drafts', {
             credentials: 'include',
             headers: {
@@ -46,27 +60,28 @@ function HomeComponent() {
             }
           });
           
-          console.log('📊 Response status:', response.status);
+          console.log('📊 Auto-load response status:', response.status);
           
           if (response.ok) {
             const data = await response.json();
-            console.log('📥 Data:', data);
-            console.log('📥 Events count:', data.events ? data.events.length : 'No events property');
+            console.log('📥 Auto-load data:', data);
+            console.log('📥 Auto-load events count:', data.events ? data.events.length : 'No events property');
             
-            if (data.events && data.events.length > 0) {
+            // Load fresh data from database
+            if (data.events) {
+              console.log('🔄 Auto-load: Setting drafts with fresh database data');
               setEventDrafts(data.events);
-              console.log('✨ Loaded', data.events.length, 'drafts from database');
             } else {
-              console.log('ℹ️ No events in response or empty events array');
+              console.log('ℹ️ Auto-load: No events in response, setting empty drafts');
               setEventDrafts([]);
             }
           } else {
             const errorText = await response.text();
-            console.error('❌ API Error - Status:', response.status, 'Response:', errorText);
+            console.error('❌ Auto-load API Error - Status:', response.status, 'Response:', errorText);
           }
         } catch (error) {
-          console.error('❌ Load error:', error);
-          console.error('❌ Load error details:', error instanceof Error ? error.message : 'Unknown error');
+          console.error('❌ Auto-load error:', error);
+          console.error('❌ Auto-load error details:', error instanceof Error ? error.message : 'Unknown error');
         } finally {
           setHasLoadedDraftsFromDB(true);
         }
@@ -74,11 +89,7 @@ function HomeComponent() {
       
       loadDraftsFromDB();
     }
-  }, [session]);
-
-  // Drafts are now saved to database via API calls, no localStorage needed
-
-  // Drafts are now loaded on component mount, no need for tab-specific loading
+  }, [activeTab, hasLoadedDraftsFromDB, session]);
 
   // Removed automatic polling - using manual refresh only
 
@@ -455,20 +466,13 @@ function HomeComponent() {
                           console.log('📥 Manual refresh data:', data);
                           console.log('📥 Events count:', data.events ? data.events.length : 'No events property');
                           
-                          if (data.events && data.events.length > 0) {
-                            setEventDrafts(prevDrafts => {
-                              const newEvents = data.events.filter((newEvent: any) => 
-                                !prevDrafts.some(existingDraft => existingDraft.id === newEvent.id)
-                              );
-                              if (newEvents.length > 0) {
-                                console.log('✨ Manual refresh: Adding', newEvents.length, 'new events');
-                                return [...newEvents, ...prevDrafts];
-                              }
-                              console.log('ℹ️ No new events to add');
-                              return prevDrafts;
-                            });
+                          // Overwrite current data with fresh data from database
+                          if (data.events) {
+                            console.log('🔄 Overwriting current drafts with fresh database data');
+                            setEventDrafts(data.events);
                           } else {
-                            console.log('ℹ️ No events in response or empty events array');
+                            console.log('ℹ️ No events in response, clearing drafts');
+                            setEventDrafts([]);
                           }
                         } else {
                           const errorText = await response.text();

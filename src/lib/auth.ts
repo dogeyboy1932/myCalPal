@@ -166,6 +166,28 @@ export const authOptions: NextAuthOptions = {
     
     async signOut({ token }) {
       console.log(`User signed out: ${token?.email}`);
+      
+      // Clear user drafts on sign out
+      if (token?.email) {
+        try {
+          const response = await fetch(`${process.env.NEXTAUTH_URL}/api/drafts/clear`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token.accessToken}`,
+            },
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            console.log(`🗑️ Cleared ${result.deletedCount} drafts for ${token.email}`);
+          } else {
+            console.error('Failed to clear drafts on sign out');
+          }
+        } catch (error) {
+          console.error('Error clearing drafts on sign out:', error);
+        }
+      }
     },
     
     async createUser({ user }) {
