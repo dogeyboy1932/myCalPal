@@ -6,8 +6,8 @@ import CalendarSelector from './CalendarSelector';
 
 interface EventDraftProps {
   event: ExtractedEvent;
-  onSave: (event: ExtractedEvent) => void;
-  onDelete: (id: string) => void;
+  onSave: (event: ExtractedEvent) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
   onPublish: (event: ExtractedEvent, calendarId?: string) => void;
 }
 
@@ -17,9 +17,14 @@ export default function EventDraft({ event, onSave, onDelete, onPublish }: Event
   const [isPublishing, setIsPublishing] = useState(false);
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>('');
 
-  const handleSave = () => {
-    onSave(editedEvent);
-    setIsEditing(false);
+  const handleSave = async () => {
+    try {
+      await onSave(editedEvent);
+      setIsEditing(false);
+    } catch (error) {
+      // Error handling is done in the parent component
+      console.error('Save failed:', error);
+    }
   };
 
   const handlePublish = async () => {
@@ -64,7 +69,14 @@ export default function EventDraft({ event, onSave, onDelete, onPublish }: Event
             {isEditing ? 'Cancel' : 'Edit'}
           </button>
           <button
-            onClick={() => onDelete(event.id)}
+            onClick={async () => {
+              try {
+                await onDelete(event.id);
+              } catch (error) {
+                // Error handling is done in the parent component
+                console.error('Delete failed:', error);
+              }
+            }}
             className="text-red-600 hover:text-red-800 text-sm font-medium"
           >
             Delete

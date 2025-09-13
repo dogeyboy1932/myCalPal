@@ -6,6 +6,7 @@ import { useSession, signIn, signOut } from 'next-auth/react';
 import { useState, useEffect } from 'react';
 import ImageUpload from '../components/ImageUpload';
 import EventDraft from '../components/EventDraft';
+import HistoryTab from '../components/HistoryTab';
 // Removed EventListener - no longer using SSE
 import { ExtractedEvent } from '../types';
 
@@ -146,18 +147,64 @@ function HomeComponent() {
     }
   };
 
-  const handleSaveEvent = (updatedEvent: ExtractedEvent) => {
-    setEventDrafts(prev => 
-      prev.map(event => 
-        event.id === updatedEvent.id 
-          ? { ...updatedEvent, updatedAt: new Date().toISOString() }
-          : event
-      )
-    );
+  const handleSaveEvent = async (updatedEvent: ExtractedEvent) => {
+    try {
+      // Update in MongoDB first
+      const response = await fetch(`/api/drafts/${updatedEvent.id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          ...updatedEvent,
+          updatedAt: new Date().toISOString()
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save draft');
+      }
+      
+      // Only update UI state if MongoDB update was successful
+      setEventDrafts(prev => 
+        prev.map(event => 
+          event.id === updatedEvent.id 
+            ? { ...updatedEvent, updatedAt: new Date().toISOString() }
+            : event
+        )
+      );
+      console.log(`✅ Successfully saved draft ${updatedEvent.id}`);
+    } catch (error) {
+      console.error('❌ Error saving draft:', error);
+      alert(error instanceof Error ? error.message : 'Failed to save draft');
+    }
   };
 
-  const handleDeleteEvent = (eventId: string) => {
-    setEventDrafts(prev => prev.filter(event => event.id !== eventId));
+  const handleDeleteEvent = async (eventId: string) => {
+    try {
+      // Delete from MongoDB first
+      const response = await fetch(`/api/drafts/${eventId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete draft');
+      }
+      
+      // Only update UI state if MongoDB deletion was successful
+      setEventDrafts(prev => prev.filter(event => event.id !== eventId));
+      console.log(`✅ Successfully deleted draft ${eventId}`);
+    } catch (error) {
+      console.error('❌ Error deleting draft:', error);
+      alert(error instanceof Error ? error.message : 'Failed to delete draft');
+    }
   };
 
   // Test function to create a sample event for debugging
@@ -226,14 +273,31 @@ function HomeComponent() {
       console.log(result)
 
       if (result.success) {
-        // Update event status to published
-        setEventDrafts(prev => 
-          prev.map(e => 
-            e.id === event.id 
-              ? { ...e, status: 'published' as const, updatedAt: new Date().toISOString() }
-              : e
-          )
-        );
+        // Move draft to published collection and remove from drafts
+        try {
+          const moveResponse = await fetch('/api/drafts/publish', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              draftId: event.id,
+              publishedEventId: result.eventId,
+              calendarProvider: 'google',
+              calendarId: calendarId
+            })
+          });
+          
+          if (!moveResponse.ok) {
+            console.error('Failed to move draft to published collection');
+          }
+        } catch (error) {
+          console.error('Error moving draft to published:', error);
+        }
+        
+        // Remove from drafts UI (draft is now published)
+        setEventDrafts(prev => prev.filter(e => e.id !== event.id));
         
         // Show success message or redirect
         // alert('Event successfully added to your calendar!');
@@ -341,7 +405,6 @@ function HomeComponent() {
           <div className="flex justify-between items-center h-16">
             <div className="flex-row items-center">
               <h1 className="text-xl font-semibold text-gray-900">AI Calendar Assistant</h1>
-              <h2 className="text-sm text-gray-900 mb-2">*Won't work with school emails*</h2>
             </div>
             
             <div className="flex items-center gap-4">
@@ -379,6 +442,7 @@ function HomeComponent() {
             {[
               { id: 'drafts', label: 'Event Drafts', icon: '📝' },
               { id: 'upload', label: 'Upload Image', icon: '📷' },
+              { id: 'history', label: 'History', icon: '📚' },
               { id: 'calendar', label: 'Calendar', icon: '📅' },
               { id: 'settings', label: 'Settings', icon: '⚙️' }
             ].map((tab) => (
@@ -528,6 +592,10 @@ function HomeComponent() {
               )}
             </div>
           </div>
+        )}
+
+        {activeTab === 'history' && (
+          <HistoryTab onRefresh={() => {}} />
         )}
 
         {activeTab === 'calendar' && (
