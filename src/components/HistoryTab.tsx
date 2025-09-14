@@ -6,6 +6,7 @@ interface PublishedEvent {
   _id: string;
   title: string;
   description?: string;
+  date: string;
   startTime: string;
   endTime: string;
   location?: string;
@@ -79,7 +80,13 @@ export default function HistoryTab({ onRefresh }: HistoryTabProps) {
   };
 
   const formatDateTime = (dateString: string) => {
+    if (!dateString) return 'Invalid Date';
+    
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return 'Invalid Date';
+    }
+    
     return date.toLocaleString('en-US', {
       year: 'numeric',
       month: 'short',
@@ -89,10 +96,46 @@ export default function HistoryTab({ onRefresh }: HistoryTabProps) {
     });
   };
 
-  const formatDuration = (startTime: string, endTime: string) => {
-    const start = new Date(startTime);
-    const end = new Date(endTime);
+  const formatEventDateTime = (date: string, time: string) => {
+    if (!date || !time) return 'Invalid Date';
+    
+    // Combine date and time into a proper datetime string
+    const dateTimeString = `${date}T${time}:00`;
+    const dateTime = new Date(dateTimeString);
+    
+    if (isNaN(dateTime.getTime())) {
+      return 'Invalid Date';
+    }
+    
+    return dateTime.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const formatDuration = (date: string, startTime: string, endTime: string) => {
+    if (!date || !startTime || !endTime) return 'Unknown duration';
+    
+    // Create proper datetime strings
+    const startDateTime = `${date}T${startTime}:00`;
+    const endDateTime = `${date}T${endTime}:00`;
+    
+    const start = new Date(startDateTime);
+    const end = new Date(endDateTime);
+    
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return 'Unknown duration';
+    }
+    
     const durationMs = end.getTime() - start.getTime();
+    
+    if (durationMs < 0) {
+      return 'Invalid duration';
+    }
+    
     const hours = Math.floor(durationMs / (1000 * 60 * 60));
     const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
     
@@ -183,11 +226,11 @@ export default function HistoryTab({ onRefresh }: HistoryTabProps) {
                   <div className="flex flex-wrap gap-4 text-sm text-gray-500">
                     <div className="flex items-center gap-1">
                       🕐
-                      <span>{formatDateTime(event.startTime)}</span>
+                      <span>{formatEventDateTime(event.date, event.startTime)}</span>
                     </div>
                     
                     <div className="flex items-center gap-1">
-                      <span>Duration: {formatDuration(event.startTime, event.endTime)}</span>
+                      <span>Duration: {formatDuration(event.date, event.startTime, event.endTime)}</span>
                     </div>
                     
                     {event.location && (
