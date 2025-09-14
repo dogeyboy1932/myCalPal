@@ -98,4 +98,4 @@ PublishedSchema.index({ userId: 1, publishedAt: -1 });
 PublishedSchema.index({ originalDraftId: 1 });
 PublishedSchema.index({ publishedEventId: 1 });
 
-export default mongoose.models.Published || mongoose.model<IPublished>('Published', PublishedSchema);
+export default mongoose.model<IPublished>('Published', PublishedSchema);

@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../../lib/auth';
-import { EventDraft } from '../../../../models';
+import Event from '../../../../models/Event';
 import { CalendarEvent } from '../../../../types';
 import { connectToDatabase } from '../../../../lib/mongodb';
 import { CalendarService } from '../../../../lib/services/calendar';
@@ -66,17 +66,18 @@ export async function POST(request: NextRequest) {
       extractedFromImage: false
     });
     
-    const eventDraft = new EventDraft({
-      userId: userId,
-      status: 'ready',
+    const eventDraft = new Event({
+      id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      userId: session.user.email,
+      status: 'draft',
       title,
-      description,
-      startTime: new Date(startTime),
-      endTime: new Date(endTime),
+      date: new Date(startTime).toISOString().split('T')[0],
+      startTime: new Date(startTime).toTimeString().split(' ')[0].substring(0, 5),
+      endTime: new Date(endTime).toTimeString().split(' ')[0].substring(0, 5),
       location,
+      description,
       attendees: attendees || [],
-      targetProvider: providerId || 'google',
-      extractedFromImage: false
+      confidence: 1.0
     });
 
     console.log('Connecting to database...');

@@ -81,44 +81,9 @@ export interface CalendarProviderTokens {
   expiresAt?: Date;
 }
 
-// User types
-export interface UserProfile {
-  id: string;
-  email: string;
-  name?: string;
-  image?: string;
-  timezone: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
 
-export interface UserPreferences {
-  defaultLanguage: string;
-  confidenceThreshold: number;
-  autoPublish: boolean;
-  defaultCalendar?: string;
-}
 
-// Draft types
-export type DraftStatus = 'pending' | 'processing' | 'ready' | 'published' | 'failed';
+// Draft types - using ExtractedEvent interface for consistency
+export type DraftStatus = 'draft' | 'published' | 'failed';
 
-export interface EventDraft {
-  id: string;
-  userId: string;
-  status: DraftStatus;
-  title: string;
-  description?: string;
-  startTime?: Date;
-  endTime?: Date;
-  location?: string;
-  attendees?: string[];
-  targetProvider?: CalendarProvider;
-  targetCalendarId?: string;
-  extractedFromImage?: boolean;
-  imageId?: string;
-  aiConfidence?: number;
-  publishedEventId?: string;
-  publishedAt?: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
+// Removed EventDraft interface - using ExtractedEvent for all draft operations

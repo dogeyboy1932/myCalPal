@@ -22,7 +22,7 @@ interface HistoryTabProps {
 export default function HistoryTab({ onRefresh }: HistoryTabProps) {
   const [publishedEvents, setPublishedEvents] = useState<PublishedEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deleting, setDeleting] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
 
   const fetchPublishedEvents = async () => {
@@ -46,38 +46,7 @@ export default function HistoryTab({ onRefresh }: HistoryTabProps) {
     }
   };
 
-  const handleDeleteHistory = async () => {
-    if (!confirm('Are you sure you want to delete all published events? This action cannot be undone.')) {
-      return;
-    }
 
-    try {
-      setDeleting(true);
-      setError(null);
-      
-      const response = await fetch('/api/published', {
-        method: 'DELETE'
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to delete history');
-      }
-      
-      console.log(`Successfully deleted ${data.deletedCount} published events`);
-      setPublishedEvents([]);
-      
-      if (onRefresh) {
-        onRefresh();
-      }
-    } catch (error) {
-      console.error('Error deleting history:', error);
-      setError(error instanceof Error ? error.message : 'Failed to delete history');
-    } finally {
-      setDeleting(false);
-    }
-  };
 
   const formatDateTime = (dateString: string) => {
     if (!dateString) return 'Invalid Date';
@@ -179,16 +148,7 @@ export default function HistoryTab({ onRefresh }: HistoryTabProps) {
             🔄 Refresh
           </button>
           
-          {publishedEvents.length > 0 && (
-            <button
-              onClick={handleDeleteHistory}
-              disabled={deleting}
-              className="flex items-center gap-2 px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
-            >
-              🗑️
-              {deleting ? 'Deleting...' : 'Delete History'}
-            </button>
-          )}
+
         </div>
       </div>
 
