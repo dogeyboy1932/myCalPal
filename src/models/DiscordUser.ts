@@ -1,10 +1,18 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
+export interface GoogleAccount {
+  accountId: string;
+  email: string;
+  registeredAt: Date;
+}
+
 export interface IDiscordUser extends Document {
   discordId: string;
   email: string;
   username?: string;
   discriminator?: string;
+  accounts: GoogleAccount[];
+  activeAccountId?: string;
   registeredAt: Date;
   lastUsed?: Date;
   isActive: boolean;
@@ -16,6 +24,12 @@ export interface IDiscordUserModel extends Model<IDiscordUser> {
   findByEmail(email: string): Promise<IDiscordUser[]>;
   registerUser(discordId: string, email: string, username?: string, discriminator?: string): Promise<IDiscordUser>;
 }
+
+const googleAccountSchema = new Schema({
+  accountId: { type: String, required: true },
+  email: { type: String, required: true },
+  registeredAt: { type: Date, default: Date.now }
+});
 
 const DiscordUserSchema: Schema = new Schema({
   discordId: {
@@ -38,6 +52,10 @@ const DiscordUserSchema: Schema = new Schema({
   discriminator: {
     type: String,
     trim: true
+  },
+  accounts: [googleAccountSchema],
+  activeAccountId: {
+    type: String
   },
   registeredAt: {
     type: Date,

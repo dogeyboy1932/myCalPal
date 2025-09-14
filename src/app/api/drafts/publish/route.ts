@@ -58,12 +58,33 @@ export async function POST(request: NextRequest) {
     await publishedEvent.save();
     
     // Remove from drafts collection
-    await Event.deleteOne({
+    console.log(`🗑️ Attempting to delete draft with id: ${draftId}, userId: ${session.user.email}, status: draft`);
+    
+    const deleteResult = await Event.deleteOne({
       id: draftId,
       userId: session.user.email,
       status: 'draft'
     });
     
+    console.log(`🗑️ Delete result:`, deleteResult);
+    
+    if (deleteResult.deletedCount === 0) {
+      console.warn(`⚠️ No draft found to delete with id: ${draftId}`);
+      // Let's check if the draft exists with different criteria
+      const existingDraft = await Event.findOne({ id: draftId });
+      if (existingDraft) {
+        console.log(`📋 Found draft with different criteria:`, {
+          id: existingDraft.id,
+          userId: existingDraft.userId,
+          status: existingDraft.status
+        });
+      } else {
+        console.log(`❌ No draft found with id: ${draftId} at all`);
+      }
+    } else {
+      console.log(`✅ Successfully deleted ${deleteResult.deletedCount} draft(s)`);
+    }
+
     console.log(`📤 Moved draft ${draftId} to published collection for user: ${session.user.email}`);
     
     return NextResponse.json({ 

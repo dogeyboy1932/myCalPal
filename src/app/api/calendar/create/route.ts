@@ -52,47 +52,15 @@ export async function POST(request: NextRequest) {
       userId = new mongoose.Types.ObjectId();
     }
 
-    // Create event draft
-    console.log('Creating event draft with data:', {
-      userId: userId,
-      status: 'ready',
+    // Skip creating draft - this endpoint is for publishing existing drafts to calendar
+    console.log('Publishing event directly to calendar (no draft creation):', {
       title,
-      description,
       startTime: new Date(startTime),
       endTime: new Date(endTime),
       location,
-      attendees: attendees || [],
-      targetProvider: providerId || 'google',
-      extractedFromImage: false
-    });
-    
-    const eventDraft = new Event({
-      id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      userId: session.user.email,
-      status: 'draft',
-      title,
-      date: new Date(startTime).toISOString().split('T')[0],
-      startTime: new Date(startTime).toTimeString().split(' ')[0].substring(0, 5),
-      endTime: new Date(endTime).toTimeString().split(' ')[0].substring(0, 5),
-      location,
       description,
-      attendees: attendees || [],
-      confidence: 1.0
+      providerId: providerId || 'google'
     });
-
-    console.log('Connecting to database...');
-    try {
-      await connectToDatabase();
-      console.log('Database connected, saving event draft...');
-      await eventDraft.save();
-      console.log('Event draft saved successfully:', eventDraft._id);
-    } catch (dbError: any) {
-      console.error('Database connection/save error:', dbError.message);
-      if (dbError.message?.includes('timed out') || dbError.message?.includes('buffering timed out')) {
-        throw new Error('Database connection timeout. Please ensure MongoDB is running.');
-      }
-      throw dbError;
-    }
 
     // Now publish to the selected calendar provider
     let calendarEventId = null;
@@ -142,11 +110,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: {
-        ...eventDraft.toObject(),
-        calendarEventId,
-        calendarEventUrl
-      }
+      eventId: calendarEventId,
+      eventUrl: calendarEventUrl,
+      message: 'Event published to calendar successfully'
     });
 
   } catch (error: any) {
