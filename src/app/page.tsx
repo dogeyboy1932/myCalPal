@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { useState, useEffect } from 'react';
 import ImageUpload from '../components/ImageUpload';
@@ -25,7 +26,7 @@ const DynamicHome = dynamic(() => Promise.resolve(HomeComponent), {
 
 function HomeComponent() {
   const { data: session, status } = useSession();
-  const [activeTab, setActiveTab] = useState('drafts');
+  const [activeTab, setActiveTab] = useState('home');
   const [isUploading, setIsUploading] = useState(false);
   const [eventDrafts, setEventDrafts] = useState<ExtractedEvent[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -228,95 +229,80 @@ function HomeComponent() {
     await handlePublishEvent(testEvent);
   };
 
-  const handlePublishEvent = async (event: ExtractedEvent, calendarId?: string) => {
-    try {
-      // Validate and ensure proper end time
-      let endTime = event.endTime;
-      if (!endTime) {
-        // Infer end time as 1 hour after start time
-        const [startHours, startMinutes] = event.startTime.split(':').map(Number);
-        const inferredEndHours = startHours + 1;
-        const endMinutesStr = startMinutes.toString().padStart(2, '0');
-        const endHoursStr = (inferredEndHours % 24).toString().padStart(2, '0');
-        endTime = `${endHoursStr}:${endMinutesStr}`;
-      }
-      
-      // Convert date and time to proper startTime and endTime (preserve original date)
-      // Use UTC date construction to avoid timezone conversion issues
-      const [year, month, day] = event.date.split('-').map(Number);
+  const handlePublishEvent = async (event: ExtractedEvent, calendarId?: string): Promise<void> => {
+    // Validate and ensure proper end time
+    let endTime = event.endTime;
+    if (!endTime) {
+      // Infer end time as 1 hour after start time
       const [startHours, startMinutes] = event.startTime.split(':').map(Number);
-      const [endHours, endMinutes] = endTime.split(':').map(Number);
-      const startDateTime = new Date(Date.UTC(year, month - 1, day, startHours, startMinutes, 0, 0));
-      const endDateTime = new Date(Date.UTC(year, month - 1, day, endHours, endMinutes, 0, 0));
-      
-      const response = await fetch('/api/calendar/create', {
+      const inferredEndHours = startHours + 1;
+      const endMinutesStr = startMinutes.toString().padStart(2, '0');
+      const endHoursStr = (inferredEndHours % 24).toString().padStart(2, '0');
+      endTime = `${endHoursStr}:${endMinutesStr}`;
+    }
+    
+    // Convert date and time to proper startTime and endTime (preserve original date)
+    // Use UTC date construction to avoid timezone conversion issues
+    const [year, month, day] = event.date.split('-').map(Number);
+    const [startHours, startMinutes] = event.startTime.split(':').map(Number);
+    const [endHours, endMinutes] = endTime.split(':').map(Number);
+    const startDateTime = new Date(Date.UTC(year, month - 1, day, startHours, startMinutes, 0, 0));
+    const endDateTime = new Date(Date.UTC(year, month - 1, day, endHours, endMinutes, 0, 0));
+    
+    const response = await fetch('/api/calendar/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        title: event.title,
+        startTime: startDateTime.toISOString(),
+        endTime: endDateTime.toISOString(),
+        location: event.location,
+        description: event.description,
+        providerId: 'google',
+        calendarId: calendarId
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to create calendar event');
+    }
+
+    const result = await response.json();
+    console.log(result)
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to publish event');
+    }
+
+    // Move draft to published collection and remove from drafts
+    try {
+      const moveResponse = await fetch('/api/drafts/publish', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
-          title: event.title,
-          startTime: startDateTime.toISOString(),
-          endTime: endDateTime.toISOString(),
-          location: event.location,
-          description: event.description,
-          providerId: 'google',
+          draftId: event.id,
+          publishedEventId: result.eventId,
+          calendarProvider: 'google',
           calendarId: calendarId
-        }),
+        })
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to create calendar event');
-      }
-
-      const result = await response.json();
-      console.log(result)
-
-      if (result.success) {
-        // Move draft to published collection and remove from drafts
-        try {
-          const moveResponse = await fetch('/api/drafts/publish', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            credentials: 'include',
-            body: JSON.stringify({
-              draftId: event.id,
-              publishedEventId: result.eventId,
-              calendarProvider: 'google',
-              calendarId: calendarId
-            })
-          });
-          
-          if (!moveResponse.ok) {
-            console.error('Failed to move draft to published collection');
-          }
-        } catch (error) {
-          console.error('Error moving draft to published:', error);
-        }
-        
-        // Remove from drafts UI (draft is now published)
-        setEventDrafts(prev => prev.filter(e => e.id !== event.id));
-        
-        // Show success message or redirect
-        // alert('Event successfully added to your calendar!');
-      } else {
-        throw new Error(result.error || 'Failed to publish event');
+      
+      if (!moveResponse.ok) {
+        console.error('Failed to move draft to published collection');
+        // Don't throw here as the calendar event was created successfully
       }
     } catch (error) {
-      console.error('Publish error:', error);
-      alert(error instanceof Error ? error.message : 'Failed to publish event');
-      
-      // Update event status to failed
-      setEventDrafts(prev => 
-        prev.map(e => 
-          e.id === event.id 
-            ? { ...e, status: 'failed' as const, updatedAt: new Date().toISOString() }
-            : e
-        )
-      );
+      console.error('Error moving draft to published:', error);
+      // Don't throw here as the calendar event was created successfully
     }
+    
+    // Remove from drafts UI only on successful completion (draft is now published)
+    setEventDrafts(prev => prev.filter(e => e.id !== event.id));
   };
 
   if (status === 'loading') {
@@ -440,11 +426,10 @@ function HomeComponent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex space-x-8">
             {[
+              { id: 'home', label: 'Home', icon: '🏠' },
               { id: 'drafts', label: 'Event Drafts', icon: '📝' },
               { id: 'upload', label: 'Upload Image', icon: '📷' },
-              { id: 'history', label: 'History', icon: '📚' },
-              { id: 'calendar', label: 'Calendar', icon: '📅' },
-              { id: 'settings', label: 'Settings', icon: '⚙️' }
+              { id: 'history', label: 'History', icon: '📋' }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -459,12 +444,96 @@ function HomeComponent() {
                 {tab.label}
               </button>
             ))}
+            
+            {/* Instructions Link */}
+            <Link
+              href="/instructions"
+              className="py-4 px-1 border-b-2 border-transparent font-bold text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-colors"
+            >
+              <span className="mr-2">❓</span>
+              How To Use
+            </Link>
           </nav>
         </div>
       </div>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {activeTab === 'home' && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-bold text-gray-900 mb-4">Welcome to MyCalPal</h1>
+              <p className="text-lg text-gray-600 mb-6">
+                Your AI-powered calendar assistant that turns images into calendar events
+              </p>
+              
+              <div className="flex justify-center mb-8">
+                <button
+                  onClick={() => signOut()}
+                  className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                >
+                  <span>🚪</span>
+                  Sign Out
+                </button>
+              </div>
+            </div>
+            
+            {/* Calendar Integration */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+                <span className="text-blue-600">📅</span>
+                Google Calendar Integration
+              </h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-green-600">✅</span>
+                      <h3 className="font-medium text-green-900">Connected Account</h3>
+                    </div>
+                    <p className="text-sm text-green-700">
+                      {session.user?.email || 'No account connected'}
+                    </p>
+                  </div>
+                  
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-blue-600">🔄</span>
+                      <h3 className="font-medium text-blue-900">Auto-Sync</h3>
+                    </div>
+                    <p className="text-sm text-blue-700">
+                      Events are automatically synced to your Google Calendar when published
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-purple-600">🎯</span>
+                      <h3 className="font-medium text-purple-900">Smart Detection</h3>
+                    </div>
+                    <p className="text-sm text-purple-700">
+                      AI automatically extracts event details from your images
+                    </p>
+                  </div>
+                  
+                  <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-orange-600">⚡</span>
+                      <h3 className="font-medium text-orange-900">Quick Actions</h3>
+                    </div>
+                    <p className="text-sm text-orange-700">
+                      Review, edit, and publish events with just a few clicks
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'upload' && (
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">Upload Event Image</h2>
@@ -598,120 +667,7 @@ function HomeComponent() {
           <HistoryTab onRefresh={() => {}} />
         )}
 
-        {activeTab === 'calendar' && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Calendar Integration</h2>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <span className="font-medium">Google Calendar</span>
-                </div>
-                <span className="text-sm text-green-600">Connected</span>
-              </div>
-              
-              <div className="text-sm text-gray-500">
-                <p>Your events will be automatically synced to your connected calendar.</p>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {activeTab === 'settings' && (
-          <div className="space-y-6">
-            {/* Account Management Section */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">Account Management</h2>
-              <div className="space-y-4">
-                <div className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <svg className="w-5 h-5 text-blue-600" viewBox="0 0 24 24">
-                          <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                          <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                          <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                          <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                        </svg>
-                      </div>
-                      <div>
-                        <div className="font-medium text-gray-900">{session?.user?.name || 'Google Account'}</div>
-                        <div className="text-sm text-gray-500">{session?.user?.email}</div>
-                        <div className="text-xs text-green-600 mt-1">✓ Calendar access granted</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => signOut()}
-                        className="text-sm text-red-600 hover:text-red-700 px-3 py-1 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
-                      >
-                        Disconnect
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="text-sm text-gray-600">
-                  <p className="mb-2"><strong>Permissions granted:</strong></p>
-                  <ul className="list-disc list-inside space-y-1 text-xs">
-                    <li>Read your calendar events</li>
-                    <li>Create new calendar events</li>
-                    <li>Access your calendar list</li>
-                  </ul>
-                </div>
-                
-                <button
-                  onClick={() => signIn('google')}
-                  className="w-full flex items-center justify-center gap-3 bg-blue-600 text-white rounded-lg px-4 py-2 hover:bg-blue-700 transition-colors text-sm"
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24">
-                    <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                    <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                  </svg>
-                  Add Another Google Account
-                </button>
-              </div>
-            </div>
-            
-            {/* App Settings Section */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">App Settings</h2>
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Default Language for AI Extraction
-                  </label>
-                  <select className="w-full border border-gray-300 rounded-lg px-3 py-2">
-                    <option>English</option>
-                    <option>Spanish</option>
-                    <option>French</option>
-                    <option>German</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Confidence Threshold
-                  </label>
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="1.0"
-                    step="0.1"
-                    defaultValue="0.7"
-                    className="w-full"
-                  />
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
-                    <span>Low (0.1)</span>
-                    <span>High (1.0)</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </main>
     </div>
   );

@@ -8,7 +8,7 @@ interface EventDraftProps {
   event: ExtractedEvent;
   onSave: (event: ExtractedEvent) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
-  onPublish: (event: ExtractedEvent, calendarId?: string) => void;
+  onPublish: (event: ExtractedEvent, calendarId?: string) => Promise<void>;
 }
 
 export default function EventDraft({ event, onSave, onDelete, onPublish }: EventDraftProps) {
@@ -16,6 +16,7 @@ export default function EventDraft({ event, onSave, onDelete, onPublish }: Event
   const [editedEvent, setEditedEvent] = useState<ExtractedEvent>(event);
   const [isPublishing, setIsPublishing] = useState(false);
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>('');
+  const [publishMessage, setPublishMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   const handleSave = async () => {
     try {
@@ -29,8 +30,16 @@ export default function EventDraft({ event, onSave, onDelete, onPublish }: Event
 
   const handlePublish = async () => {
     setIsPublishing(true);
+    setPublishMessage(null);
     try {
       await onPublish(editedEvent, selectedCalendarId);
+      setPublishMessage({ type: 'success', text: 'Event successfully published to calendar!' });
+      // Clear success message after 5 seconds
+      setTimeout(() => setPublishMessage(null), 5000);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to publish event. Please try again.';
+      setPublishMessage({ type: 'error', text: errorMessage });
+      console.error('Publish failed:', error);
     } finally {
       setIsPublishing(false);
     }
@@ -172,6 +181,21 @@ export default function EventDraft({ event, onSave, onDelete, onPublish }: Event
               {isPublishing ? 'Publishing...' : 'Publish to Calendar'}
             </button>
           </div>
+          
+          {publishMessage && (
+            <div className={`mt-3 p-3 rounded-lg border ${
+              publishMessage.type === 'success' 
+                ? 'bg-green-50 border-green-200 text-green-800' 
+                : 'bg-red-50 border-red-200 text-red-800'
+            }`}>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">
+                  {publishMessage.type === 'success' ? '✅' : '❌'}
+                </span>
+                <span className="text-sm">{publishMessage.text}</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
