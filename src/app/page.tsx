@@ -347,7 +347,7 @@ function HomeComponent() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">Welcome to Calendar Assistant</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">Welcome to MyCalPal</h1>
           <p className="text-gray-600 mb-8">Please sign in with Google to continue</p>
           <button
               onClick={() => signIn('google')}
@@ -492,7 +492,7 @@ function HomeComponent() {
         {activeTab === 'home' && (
           <div className="bg-white rounded-lg shadow p-6">
             <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 mb-4">Welcome to MyCalPal</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-4">MyCalPal</h1>
               <p className="text-lg text-gray-600 mb-6">
                 Your AI-powered calendar assistant that turns images into calendar events
               </p>
