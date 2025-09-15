@@ -17,9 +17,10 @@ interface PublishedEvent {
 
 interface HistoryTabProps {
   onRefresh?: () => void;
+  userId?: string;
 }
 
-export default function HistoryTab({ onRefresh }: HistoryTabProps) {
+export default function HistoryTab({ onRefresh, userId }: HistoryTabProps) {
   const [publishedEvents, setPublishedEvents] = useState<PublishedEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -29,9 +30,14 @@ export default function HistoryTab({ onRefresh }: HistoryTabProps) {
     try {
       setLoading(true);
       setError(null);
-      
-      const response = await fetch('/api/published');
+      let url = '/api/published';
+      if (userId) {
+        url += `?userId=${encodeURIComponent(userId)}`;
+      }
+      const response = await fetch(url);
       const data = await response.json();
+
+      console.log('Fetched published events:', data);
       
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch published events');

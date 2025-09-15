@@ -7,10 +7,20 @@ export async function GET(request: NextRequest) {
   try {
     await connectToDatabase();
 
-    // Fetch all published events, sorted by publishedAt (newest first)
-    const publishedEvents = await Published.find({}).sort({ publishedAt: -1 });
+    // Get userId from query params if present
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
 
-    console.log(`Found ${publishedEvents.length} published events`);
+    console.log(request)
+    console.log(userId)
+
+    // Build query object
+    const query = userId ? { userId } : {};
+
+    // Fetch filtered published events, sorted by publishedAt (newest first)
+    const publishedEvents = await Published.find(query).sort({ publishedAt: -1 });
+
+    console.log(`Found ${publishedEvents.length} published events${userId ? ` for userId=${userId}` : ''}`);
 
     return NextResponse.json({
       success: true,

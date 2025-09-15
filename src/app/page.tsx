@@ -700,7 +700,7 @@ function HomeComponent() {
         )}
 
         {activeTab === 'history' && (
-          <HistoryTab onRefresh={() => {}} />
+          <HistoryTab onRefresh={() => {}} userId={session.user.email!} />
         )}
 
 
