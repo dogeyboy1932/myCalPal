@@ -381,7 +381,7 @@ function HomeComponent() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">MyCalPalistant</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">MyCalPal</h1>
             <p className="text-gray-600">Extract events from images using AI and sync to your calendar</p>
           </div>
           
@@ -425,7 +425,7 @@ function HomeComponent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex-row items-center">
-              <h1 className="text-xl font-semibold text-gray-900">MyCalPalistant</h1>
+              <h1 className="text-xl font-semibold text-gray-900">MyCalPal</h1>
             </div>
             
             <div className="flex items-center gap-4">

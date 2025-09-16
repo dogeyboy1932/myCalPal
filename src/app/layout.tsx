@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MyCalPalistant",
+  title: "MyCalPal",
   description: "Extract events from images using AI and sync with your calendar",
 };
 
