@@ -277,7 +277,7 @@ export async function POST(request: NextRequest) {
         category: extractedData.category,
         confidence: extractedData.confidence || 0,
         status: 'draft',
-        userId: 'receiver@internal',
+        userId: userId,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
