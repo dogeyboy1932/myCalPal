@@ -260,13 +260,18 @@ function HomeComponent() {
       endTime = `${endHoursStr}:${endMinutesStr}`;
     }
     
-    // Convert date and time to proper startTime and endTime (preserve original date)
-    // Use UTC date construction to avoid timezone conversion issues
+    // Convert date and time to proper startTime and endTime (preserve original local time)
     const [year, month, day] = event.date.split('-').map(Number);
     const [startHours, startMinutes] = event.startTime.split(':').map(Number);
     const [endHours, endMinutes] = endTime.split(':').map(Number);
-    const startDateTime = new Date(Date.UTC(year, month - 1, day, startHours, startMinutes, 0, 0));
-    const endDateTime = new Date(Date.UTC(year, month - 1, day, endHours, endMinutes, 0, 0));
+    
+    // Create local datetime and then convert to ISO string to preserve the intended time
+    const startDateTime = new Date(year, month - 1, day, startHours, startMinutes, 0, 0);
+    const endDateTime = new Date(year, month - 1, day, endHours, endMinutes, 0, 0);
+
+
+    console.log("START TIME: ", startDateTime)
+    console.log("END TIME: ", endDateTime)
     
     const response = await fetch('/api/calendar/create', {
       method: 'POST',

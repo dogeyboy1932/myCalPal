@@ -32,6 +32,7 @@ export default function EventDraft({ event, onSave, onDelete, onPublish }: Event
     setIsPublishing(true);
     setPublishMessage(null);
     try {
+      console.log("EDITED: ", editedEvent)
       await onPublish(editedEvent, selectedCalendarId);
       setPublishMessage({ type: 'success', text: 'Event successfully published to calendar!' });
       // Clear success message after 5 seconds
