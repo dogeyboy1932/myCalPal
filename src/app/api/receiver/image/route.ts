@@ -249,7 +249,7 @@ export async function POST(request: NextRequest) {
     const extractResult: AIExtractionResult = {
       id: `extraction_${randomUUID()}`,
       imageId: `image_${randomUUID()}`,
-      userId: 'receiver@internal',
+      userId: userId,
       status: 'completed',
       extractedData,
       confidence: extractedData.confidence,
