@@ -74,12 +74,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Text-only payload support
+    // Text-only payload support (handles both 'text' and 'log' fields)
     const text = (formData.get('text') as string) || '';
-    console.log("📝 [TEXT] Text content length:", text.length)
-    console.log("📝 [TEXT] Text content preview:", text.substring(0, 100))
+    const logText = (formData.get('log') as string) || '';
+    const textContent = text || logText; // Use either text or log field
+    console.log("📝 [TEXT] Text content length:", textContent.length)
+    console.log("📝 [TEXT] Text content preview:", textContent.substring(0, 100))
+    console.log("📝 [TEXT] Source field:", logText ? 'log' : 'text')
     
-    if (text && text.trim().length > 0) {
+    if (textContent && textContent.trim().length > 0) {
       console.log("📝 [TEXT] Processing text-only payload")
       const source = (formData.get('source') as string) || 'bot';
       const discordMessageId = (formData.get('discordMessageId') as string) || undefined;
@@ -88,14 +91,14 @@ export async function POST(request: NextRequest) {
       const discordAuthorId = (formData.get('discordAuthorId') as string) || undefined;
 
       console.log('=== DISCORD TEXT RECEIVED ===');
-      console.log({ text, source, discordMessageId, discordChannelId, discordAuthorId });
+      console.log({ textContent, source, discordMessageId, discordChannelId, discordAuthorId });
 
       // Extract event from text using Gemini
       console.log("🤖 [AI] Starting Gemini text extraction...");
       let extractedData;
       
       try {
-        extractedData = await geminiService.extractEventFromText(text);
+        extractedData = await geminiService.extractEventFromText(textContent);
         console.log("✅ [AI] Gemini text extraction successful");
         console.log("🤖 [AI] Extracted data:", JSON.stringify(extractedData, null, 2));
       } catch (error) {
@@ -161,8 +164,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         data: {
-          type: 'text',
-          text,
+          type: logText ? 'log' : 'text',
+          text: textContent,
           source,
           discord: discordMessageId || discordChannelId || discordAuthorId
             ? { messageId: discordMessageId, channelId: discordChannelId, authorId: discordAuthorId }
