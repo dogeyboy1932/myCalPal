@@ -18,8 +18,8 @@ export default function InstructionsPage() {
               </h2>
               <p className="text-gray-600 leading-relaxed">
                 MyCalPal is your AI-powered calendar assistant that works seamlessly with Discord and Google Calendar. 
-                Send images of handwritten notes, schedules, or event details through Discord, and watch as they're 
-                automatically converted into Google Calendar events!
+                Send images of handwritten notes, schedules, or event details through Discord, or use the new text logging 
+                feature to type event information directly. Watch as they're automatically converted into Google Calendar events!
               </p>
             </section>
 
@@ -98,7 +98,7 @@ export default function InstructionsPage() {
             {/* Usage Instructions */}
             <section className="bg-purple-50 rounded-lg p-6">
               <h2 className="text-2xl font-semibold text-purple-800 mb-4 flex items-center">
-                📸 How to Use
+                📸 How to Use - Image Upload
               </h2>
               
               <div className="space-y-4">
@@ -121,6 +121,73 @@ export default function InstructionsPage() {
                     <li>Event flyers and announcements</li>
                     <li>Calendar pages or planners</li>
                     <li>Any text containing date, time, and event information</li>
+                  </ul>
+                  <div className="mt-3 p-3 bg-purple-100 border border-purple-200 rounded-lg">
+                    <p className="text-sm text-purple-700">
+                      <strong>💡 New:</strong> You can also use the <code className="bg-purple-200 px-2 py-1 rounded text-xs">!log</code> 
+                      command to send event information as text messages instead of images!
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Log Feature */}
+            <section className="bg-emerald-50 rounded-lg p-6">
+              <h2 className="text-2xl font-semibold text-emerald-800 mb-4 flex items-center">
+                📝 Text Logging Feature
+              </h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-medium text-emerald-700 mb-2">Send Text Messages</h3>
+                  <p className="text-gray-700 mb-3">
+                    You can now send text-based event information directly to the bot using the log command:
+                  </p>
+                  <code className="bg-gray-800 text-green-400 px-3 py-2 rounded block font-mono mb-2">
+                    !log Meeting with client at 2PM tomorrow
+                  </code>
+                  <p className="text-gray-600 text-sm">
+                    The bot will process your text message the same way as images - using AI to extract event details and create calendar drafts!
+                  </p>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-medium text-emerald-700 mb-2">Usage Examples</h3>
+                  <div className="space-y-2">
+                    <div className="bg-white p-3 rounded border">
+                      <code className="text-emerald-600 font-mono">!log Doctor appointment on Friday at 3:30PM</code>
+                    </div>
+                    <div className="bg-white p-3 rounded border">
+                      <code className="text-emerald-600 font-mono">!log Team meeting tomorrow 10AM to 11:30AM in conference room B</code>
+                    </div>
+                    <div className="bg-white p-3 rounded border">
+                      <code className="text-emerald-600 font-mono">!log Birthday party next Saturday at 6PM, bring gifts</code>
+                    </div>
+                    <div className="bg-white p-3 rounded border">
+                      <code className="text-emerald-600 font-mono">!log Call mom on Sunday afternoon</code>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-medium text-emerald-700 mb-2">How It Works</h3>
+                  <ol className="list-decimal list-inside space-y-2 text-gray-700">
+                    <li>Type <code className="bg-gray-200 px-2 py-1 rounded text-sm">!log</code> followed by your event description</li>
+                    <li>The bot processes your text using the same AI as image processing</li>
+                    <li>Event drafts are created in your dashboard (Event Drafts tab)</li>
+                    <li>You can edit and publish the events to your Google Calendar</li>
+                    <li>You'll receive a confirmation message when processing is complete</li>
+                  </ol>
+                </div>
+
+                <div className="bg-emerald-100 border border-emerald-200 rounded-lg p-4">
+                  <h4 className="font-medium text-emerald-800 mb-2">💡 Pro Tips</h4>
+                  <ul className="text-sm text-emerald-700 space-y-1">
+                    <li>• Include specific dates and times for better accuracy</li>
+                    <li>• Mention locations when relevant</li>
+                    <li>• Add context or descriptions to help with categorization</li>
+                    <li>• Use natural language - the AI understands conversational text</li>
                   </ul>
                 </div>
               </div>
@@ -193,19 +260,9 @@ export default function InstructionsPage() {
                 💬 Support
               </h2>
               
-              <p className="text-gray-700 mb-4">
-                Need help? Here are your options:
-              </p>
-              
               <div className="space-y-3">
-                <div>
-                  <strong className="text-gray-700">Check Status (via DM):</strong>
-                  <code className="bg-gray-800 text-green-400 px-2 py-1 rounded ml-2 font-mono">!accounts</code>
-                  <span className="text-gray-600 text-sm ml-2">- View your registered accounts</span>
-                </div>
-                
                 <div className="border-t pt-3">
-                  <strong className="text-gray-700">Email Support:</strong>
+                  <strong className="text-gray-700">Need help?</strong>
                   <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <p className="text-sm text-blue-800 mb-2">
                       For technical support issues, email:
