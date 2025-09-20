@@ -548,7 +548,7 @@ class DiscordBotService {
       
       // Send confirmation to user
       if (!message.guildId) {
-        await message.reply('✅ Got it! Your log has been saved to your calendar account.');
+        await message.reply('✅ Got it! Your log has been drafted as an event!');
       }
     } catch (error) {
       console.error('❌ [DISCORD] Error handling log command:', error);
