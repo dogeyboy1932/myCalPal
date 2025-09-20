@@ -493,34 +493,66 @@ class DiscordBotService {
 
 
   private async handleLogCommand(message: Message): Promise<void> {
-
-    
-    console.log('📜 [DISCORD] Handling log command for user:', message.author.tag);
-
     try {
-      const discordId = message.author.id;
-      const response = await fetch(`${this.config.CALENDAR_APP_URL}/api/discord/logs?discordId=${discordId}`);
-      const data = await response.json() as any;
-
-      if (!data.success) {
-        await message.reply('❌ Failed to retrieve your logs. Please try again later.');
+      const { RECEIVER_URL, RECEIVER_TOKEN } = this.config;
+      
+      // Extract log content from the command
+      const content = message.content.replace('!log', '').trim();
+      if (!content) {
+        await message.reply('❌ Please provide log content after `!log`\n\nExample: `!log Meeting with client went well`');
         return;
       }
 
-      if (data.logs.length === 0) {
-        await message.reply('📭 You have no recent activity logs.');
+      console.log('📜 [DISCORD] Sending log message, length:', content.length);
+      console.log('📜 [DISCORD] Log content preview:', content.substring(0, 100) + (content.length > 100 ? '...' : ''));
+
+      // Get user's registered email
+      const userEmail = await this.getUserEmail(message.author.id);
+      if (!userEmail) {
+        console.log('❌ [DISCORD] User not registered, sending registration prompt');
+        await message.reply(`❌ **You need to register first!**\n\nTo link your Discord account with your email, use:\n\`!register\`\n\nAfter registration, you can send log messages that will be saved to your calendar account.`);
         return;
       }
 
-      let logsList = '📜 **Your Recent Activity Logs:**\n\n';
-      data.logs.forEach((log: any) => {
-        logsList += `**${log.timestamp}:** ${log.action}\n`;
+      console.log('✅ [DISCORD] User registered with email:', userEmail);
+
+      // Build FormData for log submission - send to same endpoint as images
+      const formData = new FormData();
+      formData.set('log', content);  // Use 'log' field as supported by receiver API
+      formData.set('source', 'discord');
+      formData.set('discordMessageId', message.id);
+      formData.set('discordChannelId', message.channelId);
+      formData.set('discordAuthorId', message.author.id);
+      formData.set('userEmail', userEmail);
+
+      console.log('🚀 [DISCORD] Sending log POST request to receiver...');
+      const res = await fetch(RECEIVER_URL, {
+        method: 'POST',
+        headers: {
+          'x-receiver-token': RECEIVER_TOKEN,
+        },
+        body: formData as any,
       });
 
-      await message.reply(logsList);
+      console.log('📡 [DISCORD] Log response status:', res.status, res.statusText);
+      const json = await res.json();
+      console.log('📡 [DISCORD] Log response body:', JSON.stringify(json, null, 2));
+      
+      if (!res.ok || !json) {
+        console.error('❌ [DISCORD] Receiver responded with error for log', res.status, json);
+        await message.reply('❌ Failed to save your log. Please try again later.');
+        return;
+      }
+
+      console.log('✅ [DISCORD] Successfully forwarded log:', json ? 'SUCCESS' : 'FAILED');
+      
+      // Send confirmation to user
+      if (!message.guildId) {
+        await message.reply('✅ Got it! Your log has been saved to your calendar account.');
+      }
     } catch (error) {
-      console.error('Error handling log command:', error);
-      await message.reply('❌ An error occurred while retrieving your logs.');
+      console.error('❌ [DISCORD] Error handling log command:', error);
+      await message.reply('❌ An error occurred while saving your log.');
     }
   }
   
