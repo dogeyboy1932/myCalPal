@@ -535,12 +535,12 @@ class DiscordBotService {
       });
 
       console.log('📡 [DISCORD] Log response status:', res.status, res.statusText);
-      const json = await res.json();
+      const json: any = await res.json();
       console.log('📡 [DISCORD] Log response body:', JSON.stringify(json, null, 2));
       
       if (!res.ok || !json) {
         console.error('❌ [DISCORD] Receiver responded with error for log', res.status, json);
-        await message.reply('❌ Failed to save your log. Please try again later.');
+        await message.reply(`❌ ${json.error || 'Failed to draft your log as an event.'}`);
         return;
       }
 
