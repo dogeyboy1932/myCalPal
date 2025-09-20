@@ -161,12 +161,6 @@ export default function InstructionsPage() {
                     <div className="bg-white p-3 rounded border">
                       <code className="text-emerald-600 font-mono">!log Team meeting tomorrow 10AM to 11:30AM in conference room B</code>
                     </div>
-                    <div className="bg-white p-3 rounded border">
-                      <code className="text-emerald-600 font-mono">!log Birthday party next Saturday at 6PM, bring gifts</code>
-                    </div>
-                    <div className="bg-white p-3 rounded border">
-                      <code className="text-emerald-600 font-mono">!log Call mom on Sunday afternoon</code>
-                    </div>
                   </div>
                 </div>
 
