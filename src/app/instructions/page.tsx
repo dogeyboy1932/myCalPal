@@ -33,7 +33,7 @@ export default function InstructionsPage() {
                 <div>
                   <h3 className="text-lg font-medium text-blue-700 mb-2">Step 1: Add Bot to Your Server</h3>
                   <p className="text-gray-700 mb-3">
-                    Click the link below to add MyCalPal bot to your Discord server:
+                    Click the link below to add MyCalPal bot to your Discord server that you are in:
                   </p>
                   <a 
                     href="https://discord.com/oauth2/authorize?client_id=1414967584301781173" 
@@ -41,20 +41,20 @@ export default function InstructionsPage() {
                     rel="noopener noreferrer"
                     className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
                   >
-                    🔗 Add MyCalPal Bot to Discord
+                    🔗 Add MyCalPal (or Calendar-App) Bot
                   </a>
                 </div>
 
                 <div>
                   <h3 className="text-lg font-medium text-blue-700 mb-2">Step 2: Register Your Google Account</h3>
                   <p className="text-gray-700 mb-2">
-                    In any Discord channel where the bot is present, type:
+                    Start a conversation with the discord bot. Afterwards, type
                   </p>
                   <code className="bg-gray-800 text-green-400 px-3 py-2 rounded block font-mono">
                     !register
                   </code>
                   <p className="text-gray-600 text-sm mt-2">
-                    This will provide you with a link to connect your Google Calendar account.
+                    This will provide you with a link to connect your Google Calendar account!
                   </p>
                 </div>
               </div>
@@ -106,7 +106,7 @@ export default function InstructionsPage() {
                   <h3 className="text-lg font-medium text-purple-700 mb-2">Sending Images</h3>
                   <ol className="list-decimal list-inside space-y-2 text-gray-700">
                     <li>Take a photo of your handwritten schedule, notes, or event details</li>
-                    <li>Send the image in any Discord channel where MyCalPal bot is present</li>
+                    <li>Send the image to the MyCalPal bot (direct message)</li>
                     <li>The bot will automatically process the image using AI</li>
                     <li>Events will be created drafted in your app dashboard (check Event Drafts tab) where you can edit/publish to a calendar connected to your Google account</li>
                     <li>After every image upload, you will receive a confirmation message notifying the process is complete</li>
