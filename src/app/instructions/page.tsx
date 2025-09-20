@@ -3,8 +3,76 @@ import Link from 'next/link';
 
 export default function InstructionsPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo">
+
+            {/* Commands Reference */}
+            <section className="bg-slate-50 rounded-lg p-6">
+              <h2 className="text-2xl font-semibold text-slate-800 mb-4 flex items-center">
+                ⚡ Bot Commands Reference
+              </h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-medium text-slate-700 mb-3">Available Commands</h3>
+                  <div className="grid gap-3">
+                    <div className="bg-white border border-slate-200 rounded-lg p-4">
+                      <code className="text-slate-700 font-mono text-sm">!register</code>
+                      <p className="text-gray-600 text-sm mt-1">Initialize Google authentication to link your Discord account</p>
+                    </div>
+                    
+                    <div className="bg-white border border-slate-200 rounded-lg p-4">
+                      <code className="text-slate-700 font-mono text-sm">!log [message]</code>
+                      <p className="text-gray-600 text-sm mt-1">Send event information as text (e.g., "!log Meeting at 2PM tomorrow")</p>
+                    </div>
+                    
+                    <div className="bg-white border border-slate-200 rounded-lg p-4">
+                      <code className="text-slate-700 font-mono text-sm">!status</code> <span className="text-gray-400">or</span> <code className="text-slate-700 font-mono text-sm">!whoami</code>
+                      <p className="text-gray-600 text-sm mt-1">Check your registration status and active account</p>
+                    </div>
+                    
+                    <div className="bg-white border border-slate-200 rounded-lg p-4">
+                      <code className="text-slate-700 font-mono text-sm">!accounts</code>
+                      <p className="text-gray-600 text-sm mt-1">List all your registered Google accounts</p>
+                    </div>
+                    
+                    <div className="bg-white border border-slate-200 rounded-lg p-4">
+                      <code className="text-slate-700 font-mono text-sm">!switch [number]</code>
+                      <p className="text-gray-600 text-sm mt-1">Switch between registered accounts (use number from !accounts)</p>
+                    </div>
+                    
+                    <div className="bg-white border border-yellow-200 rounded-lg p-4 border-l-4 border-l-yellow-500">
+                      <code className="text-yellow-700 font-mono text-sm">!clear</code>
+                      <p className="text-yellow-600 text-sm mt-1 font-medium">⚠️ Shows information about clearing Discord conversation history</p>
+                      <p className="text-gray-500 text-xs mt-1">Note: Due to Discord API limitations, bots cannot delete DM messages. Command provides alternatives.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-100 border border-slate-200 rounded-lg p-4">
+                  <h4 className="font-medium text-slate-800 mb-2">📋 Quick Reference</h4>
+                  <ul className="text-sm text-slate-700 space-y-1">
+                    <li>• All commands start with <code className="bg-slate-200 px-1 rounded">!</code></li>
+                    <li>• Commands work in both server channels and direct messages</li>
+                    <li>• You must register first before using image/log features</li>
+                    <li>• Use <code className="bg-slate-200 px-1 rounded">!clear</code> to start fresh if needed</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
+
+            {/* Web Interface */}
+            <section className="bg-orange-50 rounded-lg p-6">
+              <h2 className="text-2xl font-semibold text-orange-800 mb-4 flex items-center">
+                🌐 Web Interface
+              </h2>
+              
+              <div className="space-y-4">
+                <p className="text-gray-700">
+                  You can also use MyCalPal through the web interface:
+                </p>
+              </div>
+            </section>
+
         <div className="bg-white rounded-lg shadow-xl p-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-8 text-center">
             📅 MyCalPal Instructions
@@ -182,6 +250,7 @@ export default function InstructionsPage() {
                     <li>• Mention locations when relevant</li>
                     <li>• Add context or descriptions to help with categorization</li>
                     <li>• Use natural language - the AI understands conversational text</li>
+                    <li>• Use <code className="bg-emerald-200 px-1 rounded text-xs">!clear</code> to remove all conversation history if needed</li>
                   </ul>
                 </div>
               </div>
@@ -284,6 +353,5 @@ export default function InstructionsPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

@@ -239,6 +239,8 @@ export async function POST(request: NextRequest) {
       extractedData = await geminiService.extractEventFromImage(processedBuffer, file.type);
       console.log("✅ [AI] Gemini extraction successful")
       console.log("🤖 [AI] Extracted data:", JSON.stringify(extractedData, null, 2))
+      console.log("🤖 [AI] Extracted title:", extractedData.title);
+      console.log("🤖 [AI] Extracted date:", extractedData.description);
     } catch (error) {
       console.error('❌ [AI] Gemini extraction failed:', error);
       return NextResponse.json({

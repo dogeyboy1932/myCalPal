@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
     
     console.log(`📋 Query Results:`);
     console.log(`  - Found ${events.length} events with status '${status}'`);
-    console.log(`  - Events data:`, JSON.stringify(events, null, 2));
+    // console.log(`  - Events data:`, JSON.stringify(events, null, 2));
     
     // Also check total count in database for this user
     const userQuery = {
