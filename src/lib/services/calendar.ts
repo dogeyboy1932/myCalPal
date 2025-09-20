@@ -19,7 +19,30 @@ export class CalendarService {
   }
 
   async createEvent(event: CalendarEvent, calendarId?: string) {
-    return this.provider.createEvent(event, { calendarId });
+    console.log('📋 CalendarService: Creating event...', {
+      title: event.title,
+      startTime: event.startTime?.toISOString(),
+      endTime: event.endTime?.toISOString(),
+      calendarId
+    });
+    
+    try {
+      const result = await this.provider.createEvent(event, { calendarId });
+      
+      console.log('✅ CalendarService: Event created successfully:', {
+        eventId: result.id,
+        htmlLink: result.htmlLink || result.url,
+        status: result.status
+      });
+      
+      return result;
+    } catch (error: any) {
+      console.error('❌ CalendarService: Failed to create event:', {
+        error: error.message,
+        title: event.title
+      });
+      throw error;
+    }
   }
 
   async listCalendars() {

@@ -94,9 +94,8 @@ export async function POST(request: NextRequest) {
         location,
         startTime: new Date(startTime),
         endTime: new Date(endTime),
-        attendees: [], // Add attendees if needed
-        calendarId: calendarId // Specify which calendar to use
-      });
+        attendees: [] // Add attendees if needed
+      }, calendarId); // Pass calendarId as separate parameter
       
       calendarEventId = calendarEvent.id;
       calendarEventUrl = calendarEvent.url;

@@ -34,6 +34,8 @@ Analyze this image and extract event information. Return ONLY a JSON object with
 If you cannot find specific information, use null for that field. Confidence should be between 0 and 1.
 For relative dates like "tomorrow", "next week", calculate the actual date. 
 Derive a description from the information you receive. THERE HAS TO BE A DESCRIPTION...
+
+The year is 2025
 `;
 
       const imagePart = {
@@ -108,6 +110,8 @@ Analyze this text and extract event information. Return ONLY a JSON object with 
 If you cannot find specific information, use null for that field. Confidence should be between 0 and 1.
 For relative dates like "tomorrow", "next week", calculate the actual date. 
 Derive a description from the information you receive. THERE HAS TO BE A DESCRIPTION.
+
+The year is 2025
 
 Text to analyze: ${text}
 `;
