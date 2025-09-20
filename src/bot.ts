@@ -112,11 +112,11 @@ class DiscordBotService {
   private setupEventHandlers() {
     if (!this.client) return;
 
-    this.client.once(Events.ClientReady, (c) => {
-      console.log(`🤖 Logged in as ${c.user.tag}`);
+    this.client.once(Events.ClientReady, (c : Client) => {
+      console.log(`🤖 Logged in as ${c.user?.tag}`);
     });
 
-    this.client.on(Events.MessageCreate, async (message) => {
+    this.client.on(Events.MessageCreate, async (message: Message) => {
       await this.handleMessage(message);
     });
   }
@@ -270,6 +270,11 @@ class DiscordBotService {
       // Handle account switch command
       if (message.content.startsWith('!switch')) {
         await this.handleSwitchCommand(message);
+        return;
+      }
+
+      if (message.content.startsWith('!log')) {
+        await this.handleLogCommand(message);
         return;
       }
 
@@ -485,6 +490,40 @@ class DiscordBotService {
       await message.reply('❌ An error occurred while switching accounts.');
     }
   }
+
+
+  private async handleLogCommand(message: Message): Promise<void> {
+
+    
+    console.log('📜 [DISCORD] Handling log command for user:', message.author.tag);
+
+    try {
+      const discordId = message.author.id;
+      const response = await fetch(`${this.config.CALENDAR_APP_URL}/api/discord/logs?discordId=${discordId}`);
+      const data = await response.json() as any;
+
+      if (!data.success) {
+        await message.reply('❌ Failed to retrieve your logs. Please try again later.');
+        return;
+      }
+
+      if (data.logs.length === 0) {
+        await message.reply('📭 You have no recent activity logs.');
+        return;
+      }
+
+      let logsList = '📜 **Your Recent Activity Logs:**\n\n';
+      data.logs.forEach((log: any) => {
+        logsList += `**${log.timestamp}:** ${log.action}\n`;
+      });
+
+      await message.reply(logsList);
+    } catch (error) {
+      console.error('Error handling log command:', error);
+      await message.reply('❌ An error occurred while retrieving your logs.');
+    }
+  }
+  
 
   private async getUserEmail(discordId: string): Promise<string | null> {
     try {
