@@ -63,11 +63,11 @@ export const authOptions: NextAuthOptions = {
         return false;
       }
       
-      console.log(`✅ ${account.provider} OAuth Sign-in successful:`, {
-        user: user.email,
-        provider: account.provider,
-        name: user.name
-      });
+      // console.log(`✅ ${account.provider} OAuth Sign-in successful:`, {
+      //   user: user.email,
+      //   provider: account.provider,
+      //   name: user.name
+      // });
       
       // MongoDB database operations commented out for JWT sessions
       // try {
@@ -117,11 +117,11 @@ export const authOptions: NextAuthOptions = {
           (session as any).tokenExpiry = token.tokenExpiry;
         }
         
-        console.log('🔍 JWT Session:', {
-          hasUser: !!session.user,
-          hasAccessToken: !!token.accessToken,
-          hasRefreshToken: !!token.refreshToken
-        });
+        // console.log('🔍 JWT Session:', {
+        //   hasUser: !!session.user,
+        //   hasAccessToken: !!token.accessToken,
+        //   hasRefreshToken: !!token.refreshToken
+        // });
       }
       
       return session;
@@ -134,12 +134,12 @@ export const authOptions: NextAuthOptions = {
         token.refreshToken = account.refresh_token;
         token.tokenExpiry = account.expires_at;
         
-        console.log('🔍 Storing tokens in JWT:', {
-          provider: account.provider,
-          hasAccessToken: !!account.access_token,
-          hasRefreshToken: !!account.refresh_token,
-          expiresAt: account.expires_at
-        });
+        // console.log('🔍 Storing tokens in JWT:', {
+        //   provider: account.provider,
+        //   hasAccessToken: !!account.access_token,
+        //   hasRefreshToken: !!account.refresh_token,
+        //   expiresAt: account.expires_at
+        // });
       }
       
       return token;
@@ -156,16 +156,16 @@ export const authOptions: NextAuthOptions = {
   
   events: {
     async signIn({ user, account, profile, isNewUser }) {
-      console.log(`User ${user.email} signed in with ${account?.provider}`);
+      // console.log(`User ${user.email} signed in with ${account?.provider}`);
       
-      if (isNewUser) {
-        console.log(`New user created: ${user.email}`);
-        // You could send a welcome email here
-      }
+      // if (isNewUser) {
+      //   console.log(`New user created: ${user.email}`);
+      //   // You could send a welcome email here
+      // }
     },
     
     async signOut({ token }) {
-      console.log(`User signed out: ${token?.email}`);
+      // console.log(`User signed out: ${token?.email}`);
       
       // Clear user drafts on sign out
       if (token?.email) {
@@ -179,8 +179,8 @@ export const authOptions: NextAuthOptions = {
           });
           
           if (response.ok) {
-            const result = await response.json();
-            console.log(`🗑️ Cleared ${result.deletedCount} drafts for ${token.email}`);
+            // const result = await response.json();
+            // console.log(`🗑️ Cleared ${result.deletedCount} drafts for ${token.email}`);
           } else {
             console.error('Failed to clear drafts on sign out');
           }
@@ -191,15 +191,15 @@ export const authOptions: NextAuthOptions = {
     },
     
     async createUser({ user }) {
-      console.log(`User created in database: ${user.email}`);
+      // console.log(`User created in database: ${user.email}`);
     },
     
     async linkAccount({ user, account, profile }) {
-      console.log(`Account ${account.provider} linked to user ${user.email}`);
+      // console.log(`Account ${account.provider} linked to user ${user.email}`);
     },
   },
   
-  debug: process.env.NODE_ENV === 'development',
+  debug: false,
 };
 
 // Helper functions for token management (disabled - requires MongoDB)

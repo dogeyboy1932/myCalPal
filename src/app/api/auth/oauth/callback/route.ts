@@ -38,13 +38,13 @@ export async function GET(request: NextRequest) {
       }
       
       return NextResponse.redirect(
-        new URL(`/auth/error?error=${encodeURIComponent(error)}`, request.url)
+        new URL(`/discord-auth/error?error=${encodeURIComponent(error)}`, request.url)
       );
     }
 
     if (!code || !state) {
       return NextResponse.redirect(
-        new URL('/auth/error?error=missing_parameters', request.url)
+        new URL('/discord-auth/error?error=missing_parameters', request.url)
       );
     }
 
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
         console.error('❌ [OAUTH-CALLBACK] Failed to send error notification:', notifyError);
       }
       
-      return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/auth/error?error=invalid_state`);
+      return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/discord-auth/error?error=invalid_state`);
     }
     
     // Clean up used session
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
     if (!userInfo.email || !userInfo.verified_email) {
       console.log(`❌ [OAUTH-CALLBACK] Email not verified for user`);
       return NextResponse.redirect(
-        new URL('/auth/error?error=email_not_verified', request.url)
+        new URL('/discord-auth/error?error=email_not_verified', request.url)
       );
     }
 
@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
     if (!registerResponse.ok || !registerResult.success) {
       console.error(`❌ [OAUTH-CALLBACK] Failed to register user:`, registerResult.error);
       return NextResponse.redirect(
-        new URL('/auth/error?error=registration_failed', request.url)
+        new URL('/discord-auth/error?error=registration_failed', request.url)
       );
     }
 
@@ -157,13 +157,13 @@ export async function GET(request: NextRequest) {
 
      // Redirect to success page
      return NextResponse.redirect(
-       new URL(`/auth/success?email=${encodeURIComponent(userInfo.email)}&discord=${encodeURIComponent(session.discordUsername || session.discordId)}`, request.url)
+       new URL(`/discord-auth/success?email=${encodeURIComponent(userInfo.email)}&discord=${encodeURIComponent(session.discordUsername || session.discordId)}`, request.url)
      );
 
   } catch (error) {
     console.error('❌ [OAUTH-CALLBACK] Error processing callback:', error);
     return NextResponse.redirect(
-      new URL('/auth/error?error=processing_failed', request.url)
+      new URL('/discord-auth/error?error=processing_failed', request.url)
     );
   }
 }
