@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
   try {
     // Determine authentication method and user ID
     const providedToken = request.headers.get('x-receiver-token') || '';
+    console.log("🔑 [AUTH] Received token:", providedToken)
     const expectedToken = getReceiverToken();
     let userId: string;
     let isTokenAuth = false;
