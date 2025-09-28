@@ -229,25 +229,6 @@ function HomeComponent() {
     await handlePublishEvent(testEvent);
   };
 
-  // Test function to directly test publish endpoint
-  const handleTestPublish = async () => {
-    if (eventDrafts.length === 0) {
-      alert('No drafts available to test publish');
-      return;
-    }
-    
-    const testDraft = eventDrafts[0];
-    console.log('🧪 Testing publish with draft:', testDraft);
-    
-    try {
-      await handlePublishEvent(testDraft, 'primary');
-      console.log('✅ Test publish completed successfully');
-    } catch (error) {
-      console.error('❌ Test publish failed:', error);
-      alert('Test publish failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    }
-  };
-
   const handlePublishEvent = async (event: ExtractedEvent, calendarId?: string): Promise<void> => {
     // Validate and ensure proper end time
     let endTime = event.endTime;
@@ -622,12 +603,7 @@ function HomeComponent() {
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium text-gray-900">Event Drafts</h2>
                 <div className="flex items-center gap-4">
-                  <button
-                    onClick={handleTestPublish}
-                    className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
-                  >
-                    🧪 Test Publish
-                  </button>
+                  
                   <button
                     onClick={async () => {
                       // alert('Button clicked! Check console for logs.');
