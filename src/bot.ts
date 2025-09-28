@@ -82,7 +82,7 @@ class DiscordBotService {
       BOT_TOKEN: process.env.DISCORD_BOT_TOKEN || '',
       RECEIVER_URL: receiverUrl,
       CALENDAR_APP_URL: calendarAppUrl,
-      RECEIVER_TOKEN: process.env.IMAGE_RECEIVER_TOKEN || process.env.RECEIVER_TOKEN || '',
+      RECEIVER_TOKEN: process.env.RECEIVER_TOKEN || '',
       ALLOWED_CHANNELS: this.parseChannels(process.env.ALLOWED_CHANNELS)
     };
   }
@@ -325,7 +325,7 @@ class DiscordBotService {
       }
 
       // Process image attachments
-      const attachments = Array.from(message.attachments.values());
+      const attachments: any = Array.from(message.attachments.values());
       console.log('📎 [DISCORD] Message has', attachments.length, 'attachments');
       
       if (attachments.length > 0) {
