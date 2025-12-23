@@ -38,6 +38,10 @@ export async function POST(request: NextRequest) {
 
     // Check for session-based authentication first (web uploads)
     const session = await getServerSession(authOptions);
+    console.log("======")
+    console.log(authOptions)
+    console.log(session)
+    console.log("======")
     
     if (session?.user?.email) {
       // Web upload with authenticated user
