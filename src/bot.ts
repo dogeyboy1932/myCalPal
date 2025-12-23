@@ -245,15 +245,8 @@ class DiscordBotService {
   }
 
   private async getUserEmail(discordId: string): Promise<string | null> {
-    const data = await this.apiCall(`/api/discord/accounts?discordId=${discordId}`);
-    
-    if (!data.success || !data.accounts || data.accounts.length === 0) {
-      return null;
-    }
-    
-    // Find the active account
-    const activeAccount = data.accounts.find((account: any) => account.isActive);
-    return activeAccount?.email || null;
+    const data = await this.apiCall(`/api/discord/register?discordId=${discordId}`) as StatusResponse;
+    return (data.success && data.registered && data.user?.email) ? data.user.email : null;
   }
 
   private async sendRegistrationPrompt(message: Message): Promise<void> {
