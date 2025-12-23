@@ -3,7 +3,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../lib/auth';
-import { cookies } from 'next/headers';
 import sharp from 'sharp';
 import { randomUUID } from 'crypto';
 // Removed broadcast imports - using direct MongoDB storage only
@@ -38,13 +37,16 @@ export async function POST(request: NextRequest) {
     console.log("🔐 [AUTH] Expected token configured:", !!expectedToken)
 
     // Check for session-based authentication first (web uploads)
-    const cookieStore = await cookies();
-    const session = await getServerSession(authOptions);
-    console.log("======")
-    console.log(authOptions)
-    console.log(session)
-    console.log("======")
-    console.log("🍪 [COOKIES] Session cookie:", cookieStore.get('next-auth.session-token') || cookieStore.get('__Secure-next-auth.session-token'))
+    // For token-based auth, skip session check entirely
+    let session = null;
+    if (!providedToken || providedToken !== expectedToken) {
+      // Only check session if not using token auth
+      session = await getServerSession(authOptions);
+      console.log("🍪 [SESSION] Session check result:", session ? 'Found' : 'Not found');
+      if (session?.user?.email) {
+        console.log("🍪 [SESSION] User email:", session.user.email);
+      }
+    }
     
     if (session?.user?.email) {
       // Web upload with authenticated user
