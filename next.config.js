@@ -1,15 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    // Warning: This allows production builds to successfully complete even if
-    // your project has ESLint errors.
-    ignoreDuringBuilds: true,
-  },
   typescript: {
     // Warning: This allows production builds to successfully complete even if
     // your project has type errors.
     ignoreBuildErrors: false,
   },
+  // Empty turbopack config to silence the warning
+  // Turbopack handles server-side code differently, so discord.js won't be bundled on client
+  turbopack: {},
   webpack: (config, { isServer }) => {
     // Exclude Discord.js and its dependencies from client-side bundle
     if (!isServer) {
