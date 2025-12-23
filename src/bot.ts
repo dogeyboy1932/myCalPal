@@ -421,6 +421,8 @@ class DiscordBotService {
   private async handleAccountsCommand(message: Message): Promise<void> {
     const data = await this.apiCall(`/api/discord/accounts?discordId=${message.author.id}`);
 
+    console.log("DATA: ", data)
+
     if (!data.success) {
       await message.reply('❌ Failed to retrieve your accounts. Please try again later.');
       return;
