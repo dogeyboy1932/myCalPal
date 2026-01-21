@@ -35,7 +35,7 @@ If you cannot find specific information, use null for that field. Confidence sho
 For relative dates like "tomorrow", "next week", calculate the actual date. 
 Derive a description from the information you receive. THERE HAS TO BE A DESCRIPTION...
 
-Today is ${new Date().toDateString()}. Be sure the date you return is in the future.
+Today is ${new Date().toDateString()}. Be sure the date you return is the closest appropriate date in the future.
 `;
 
       const imagePart = {
