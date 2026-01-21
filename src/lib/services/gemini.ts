@@ -111,7 +111,7 @@ If you cannot find specific information, use null for that field. Confidence sho
 For relative dates like "tomorrow", "next week", calculate the actual date. 
 Derive a description from the information you receive. THERE HAS TO BE A DESCRIPTION.
 
-The year is 2025
+The year is ${new Date().getFullYear()}
 
 Text to analyze: ${text}
 `;
