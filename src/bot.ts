@@ -238,7 +238,6 @@ class DiscordBotService {
         return { success: false, error: receiverError };
       }
 
-      console.log(`✅ [DISCORD] ${data.type} processed successfully`);
       return { success: true };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -277,15 +276,15 @@ class DiscordBotService {
 
   private parseCommand(content: string): { command: string; args: string } {
     const trimmed = content.trim();
-    const spaceIndex = trimmed.indexOf(' ');
+    const match = trimmed.match(/(\S+)([\s\S]*)/);
     
-    if (spaceIndex === -1) {
+    if (!match) {
       return { command: trimmed, args: '' };
     }
     
     return {
-      command: trimmed.substring(0, spaceIndex),
-      args: trimmed.substring(spaceIndex + 1).trim()
+      command: match[1],
+      args: match[2].trim()
     };
   }
 
@@ -474,6 +473,7 @@ class DiscordBotService {
 
   private async handleLogCommand(message: Message): Promise<void> {
     const content = message.content.replace(`${COMMAND_PREFIX}log`, '').trim();
+    
     if (!content) {
       await message.reply(`❌ ${ERROR_MESSAGES.NO_TEXT_PROVIDED}\n\nExample: \`${COMMAND_PREFIX}log Meeting with client went well\``);
       return;
