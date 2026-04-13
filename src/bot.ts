@@ -66,6 +66,11 @@ interface ReceiverPayload {
   fileName?: string;
 }
 
+interface ReceiverResult {
+  success: boolean;
+  error?: string;
+}
+
 class DiscordBotService {
   private client: Client | null = null;
   private isRunning = false;
@@ -177,7 +182,7 @@ class DiscordBotService {
     content?: string, 
     attachmentUrl?: string, 
     fileName?: string 
-  }): Promise<boolean> {
+  }): Promise<ReceiverResult> {
     try {
       const { RECEIVER_URL, RECEIVER_TOKEN } = this.config;
       
@@ -185,7 +190,7 @@ class DiscordBotService {
       const userEmail = await this.getUserEmail(message.author.id);
       if (!userEmail) {
         await message.reply(`❌ **You need to register first!**\n\nUse: \`!register\`\n\nAfter registration, you can upload images and send logs.`);
-        return false;
+        return { success: false, error: ERROR_MESSAGES.REGISTRATION_REQUIRED };
       }
 
       const formData = new FormData();
@@ -218,18 +223,27 @@ class DiscordBotService {
         body: formData as any,
       });
 
-      const json: any = await response.json();
+      let json: any = null;
+      let rawBody = '';
+      try {
+        rawBody = await response.text();
+        json = rawBody ? JSON.parse(rawBody) : null;
+      } catch {
+        // Non-JSON response body; keep rawBody for fallback error messaging.
+      }
       
       if (!response.ok) {
-        console.error(`❌ [DISCORD] ${data.type} processing failed:`, json?.error || 'Unknown error');
-        return false;
+        const receiverError = json?.error || json?.message || rawBody || `HTTP ${response.status}`;
+        console.error(`❌ [DISCORD] ${data.type} processing failed:`, receiverError);
+        return { success: false, error: receiverError };
       }
 
       console.log(`✅ [DISCORD] ${data.type} processed successfully`);
-      return true;
+      return { success: true };
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       console.error(`❌ [DISCORD] Error processing ${data.type}:`, err);
-      return false;
+      return { success: false, error: errorMessage };
     }
   }
 
@@ -281,11 +295,7 @@ class DiscordBotService {
 
   private async handleMessage(message: Message) {
     try {
-      console.log('💬 [DISCORD] Received message from:', message.author.tag, 'in channel:', message.channelId);
-      console.log('💬 [DISCORD] Message ID:', message.id, 'Guild ID:', message.guildId || 'DM');
-      
       if (message.author.bot) {
-        console.log('🤖 [DISCORD] Ignoring bot message');
         return;
       }
 
@@ -311,7 +321,6 @@ class DiscordBotService {
             await this.handleLogCommand(message);
             return;
           default:
-            console.log('⚠️ [DISCORD] Unrecognized command:', command);
             return;
         }
       }
@@ -320,21 +329,16 @@ class DiscordBotService {
       
       // In guild channels, optionally restrict by ALLOWED_CHANNELS; always allow DMs
       if (message.guildId && ALLOWED_CHANNELS.length > 0 && !ALLOWED_CHANNELS.includes(message.channelId)) {
-        console.log('🚫 [DISCORD] Channel not in whitelist, ignoring message');
         return; // ignore channels not whitelisted
       }
 
       // Process image attachments
       const attachments = Array.from(message.attachments.values());
-      console.log('📎 [DISCORD] Message has', attachments.length, 'attachments');
       
       if (attachments.length > 0) {
         for (const attachment of attachments) {
-          console.log('📎 [DISCORD] Processing attachment:', attachment.name, 'type:', attachment.contentType, 'size:', attachment.size);
-          
           if (this.isImageAttachment(attachment)) {
-            console.log('🖼️ [DISCORD] Found image attachment, processing...');
-            const success = await this.sendToReceiver(message, {
+            const result = await this.sendToReceiver(message, {
               type: 'image',
               attachmentUrl: attachment.url,
               fileName: attachment.name || undefined
@@ -342,10 +346,8 @@ class DiscordBotService {
             
             // Acknowledge in DMs
             if (!message.guildId) {
-              await message.reply(success ? SUCCESS_MESSAGES.IMAGE : ERROR_MESSAGES.PROCESSING_FAILED);
+              await message.reply(result.success ? SUCCESS_MESSAGES.IMAGE : `❌ ${result.error || ERROR_MESSAGES.PROCESSING_FAILED}`);
             }
-          } else {
-            console.log('⚠️ [DISCORD] Attachment is not a supported image type');
           }
         }
         return;
@@ -353,7 +355,6 @@ class DiscordBotService {
 
       // Process text messages (non-commands)
       if (message.content && message.content.trim().length > 0) {
-        console.log('📝 [DISCORD] Message has text content, forwarding...');
         await this.sendToReceiver(message, {
           type: 'text',
           content: message.content
@@ -361,11 +362,8 @@ class DiscordBotService {
         // We intentionally do not reply to text to avoid noise; logging happens on the server
         return;
       }
-      
-      console.log('⚠️ [DISCORD] Message has no processable content');
     } catch (err) {
       console.error('❌ [DISCORD] Message handler error:', err);
-      console.error('❌ [DISCORD] Handler error stack:', err instanceof Error ? err.stack : 'No stack trace');
     }
   }
 
@@ -420,8 +418,6 @@ class DiscordBotService {
 
   private async handleAccountsCommand(message: Message): Promise<void> {
     const data = await this.apiCall(`/api/discord/accounts?discordId=${message.author.id}`);
-
-    console.log("DATA: ", data)
 
     if (!data.success) {
       await message.reply('❌ Failed to retrieve your accounts. Please try again later.');
@@ -483,13 +479,13 @@ class DiscordBotService {
       return;
     }
 
-    const success = await this.sendToReceiver(message, {
+    const result = await this.sendToReceiver(message, {
       type: 'log',
       content: content
     });
 
     if (!message.guildId) {
-      await message.reply(success ? SUCCESS_MESSAGES.LOG : ERROR_MESSAGES.PROCESSING_FAILED);
+      await message.reply(result.success ? SUCCESS_MESSAGES.LOG : `❌ ${result.error || ERROR_MESSAGES.PROCESSING_FAILED}`);
     }
   }
 
