@@ -58,6 +58,9 @@ export class GeminiService {
     }
     
     const genAI = new GoogleGenerativeAI(apiKey);
+    
+    console.log("Model Name: ", process.env.MODEL_NAME || "NOT SET - defaulting to gemini-2.5-flash");
+
     this.model = genAI.getGenerativeModel({ model: process.env.MODEL_NAME || 'gemini-2.5-flash' });
   }
 
