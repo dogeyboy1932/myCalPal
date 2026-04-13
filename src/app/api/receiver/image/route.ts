@@ -19,13 +19,55 @@ function getReceiverToken() {
   return process.env.IMAGE_RECEIVER_TOKEN || '';
 }
 
+function getErrorDetails(error: unknown): string {
+  if (typeof error === 'string' && error.trim()) {
+    return error;
+  }
+
+  if (error && typeof error === 'object') {
+    const e = error as Record<string, unknown>;
+    const parts: string[] = [];
+
+    if (e.message && typeof e.message === 'string') {
+      parts.push(e.message);
+    }
+
+    if (e.status !== undefined) {
+      parts.push(`status=${String(e.status)}`);
+    }
+
+    if (e.statusText && typeof e.statusText === 'string') {
+      parts.push(`statusText=${e.statusText}`);
+    }
+
+    if (e.errorDetails !== undefined) {
+      try {
+        parts.push(`errorDetails=${JSON.stringify(e.errorDetails)}`);
+      } catch {
+        parts.push(`errorDetails=${String(e.errorDetails)}`);
+      }
+    }
+
+    if (parts.length > 0) {
+      return parts.join(' | ');
+    }
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return 'Unknown error';
+  }
+}
+
 
 
 // Handle image uploads from both bots and web clients
 export async function POST(request: NextRequest) {
-  console.log("🚀 [RECEIVER] POST request received at /api/receiver/image")
-  console.log("🚀 [RECEIVER] Request headers:", Object.fromEntries(request.headers.entries()))
-  
   try {
     // Determine authentication method and user ID
     const providedToken = request.headers.get('x-receiver-token') || '';
@@ -33,32 +75,23 @@ export async function POST(request: NextRequest) {
     let userId: string;
     let isTokenAuth = false;
     
-    console.log("🔐 [AUTH] Provided token length:", providedToken.length)
-    console.log("🔐 [AUTH] Expected token configured:", !!expectedToken)
-
     // Check for session-based authentication first (web uploads)
     // For token-based auth, skip session check entirely
     let session = null;
     if (!providedToken || providedToken !== expectedToken) {
       // Only check session if not using token auth
       session = await getServerSession(authOptions);
-      console.log("🍪 [SESSION] Session check result:", session ? 'Found' : 'Not found');
-      if (session?.user?.email) {
-        console.log("🍪 [SESSION] User email:", session.user.email);
-      }
     }
     
     if (session?.user?.email) {
       // Web upload with authenticated user
       userId = session.user.email;
-      console.log("✅ [AUTH] Session-based authentication successful for user:", userId)
     } else if (providedToken && expectedToken && providedToken === expectedToken) {
       // Token-based authentication (Discord bot)
       isTokenAuth = true;
       userId = 'discord-bot'; // Will be updated after reading form data
-      console.log("✅ [AUTH] Token-based authentication successful")
     } else {
-      console.log("❌ [AUTH] No valid authentication found")
+      console.error("❌ [AUTH] No valid authentication found")
       return NextResponse.json(
         { success: false, error: 'Unauthorized - please sign in or provide valid token' },
         { status: 401 }
@@ -66,14 +99,12 @@ export async function POST(request: NextRequest) {
     }
 
     const formData = await request.formData();
-    console.log("📋 [FORM] Form data keys:", Array.from(formData.keys()))
     
     // For Discord bot, check if user email is provided
     if (isTokenAuth) {
       const userEmail = (formData.get('userEmail') as string) || '';
       if (userEmail) {
         userId = userEmail;
-        console.log("✅ [AUTH] Discord bot with registered user:", userId)
       } else {
         console.error("⚠️ [AUTH] Discord bot with unregistered user")
         return NextResponse.json(
@@ -87,34 +118,24 @@ export async function POST(request: NextRequest) {
     const text = (formData.get('text') as string) || '';
     const logText = (formData.get('log') as string) || '';
     const textContent = text || logText; // Use either text or log field
-    console.log("📝 [TEXT] Text content length:", textContent.length)
-    console.log("📝 [TEXT] Text content preview:", textContent.substring(0, 100))
-    console.log("📝 [TEXT] Source field:", logText ? 'log' : 'text')
     
     if (textContent && textContent.trim().length > 0) {
-      console.log("📝 [TEXT] Processing text-only payload")
       const source = (formData.get('source') as string) || 'bot';
       const discordMessageId = (formData.get('discordMessageId') as string) || undefined;
       const discordChannelId = (formData.get('discordChannelId') as string) || undefined;
-      console.log("📝 [TEXT] Source:", source, "Discord Message ID:", discordMessageId, "Channel ID:", discordChannelId)
       const discordAuthorId = (formData.get('discordAuthorId') as string) || undefined;
 
-      console.log('=== DISCORD TEXT RECEIVED ===');
-      console.log({ textContent, source, discordMessageId, discordChannelId, discordAuthorId });
-
       // Extract event from text using Gemini
-      console.log("🤖 [AI] Starting Gemini text extraction...");
       let extractedData;
       
       try {
         extractedData = await geminiService.extractEventFromText(textContent);
-        console.log("✅ [AI] Gemini text extraction successful");
-        console.log("🤖 [AI] Extracted data:", JSON.stringify(extractedData, null, 2));
       } catch (error) {
-        console.error('❌ [AI] Gemini text extraction failed:', error);
+        const errorMessage = getErrorDetails(error);
+        console.error('❌ [AI] Gemini text extraction failed:', errorMessage);
         return NextResponse.json({
           success: false,
-          error: 'Failed to extract event from text'
+          error: errorMessage
         }, { status: 500 });
       }
 
@@ -135,8 +156,6 @@ export async function POST(request: NextRequest) {
           userId: userId
         };
 
-        console.log('📝 [RECEIVER] Saving text-extracted event to MongoDB');
-        
         try {
           await connectToDatabase();
           
@@ -146,8 +165,6 @@ export async function POST(request: NextRequest) {
             createdAt: new Date(),
             updatedAt: new Date()
           });
-          
-          console.log('✅ Text event saved to MongoDB:', savedEvent._id);
           
           return NextResponse.json({
             success: true,
@@ -165,8 +182,7 @@ export async function POST(request: NextRequest) {
           });
         }
       } else {
-        console.log('⚠️ [VALIDATION] Event not saved - invalid data, low confidence, or discord-bot user');
-        console.log('⚠️ [VALIDATION] Title:', !!extractedData?.title, 'Confidence:', extractedData?.confidence, 'UserId:', userId);
+        console.warn('⚠️ [VALIDATION] Event not saved - invalid data, low confidence, or discord-bot user');
       }
 
       // If no event extracted, return text data only
@@ -185,14 +201,8 @@ export async function POST(request: NextRequest) {
 
     // Support flexible field names from different bots/clients
     let file = (formData.get('file') || formData.get('image')) as File | null;
-    console.log("📁 [FILE] File found:", !!file)
-    
-    if (file) {
-      console.log("📁 [FILE] File details - Name:", file.name, "Type:", file.type, "Size:", file.size)
-    }
 
     if (!file) {
-      console.log("❌ [FILE] No image file provided in form data")
       return NextResponse.json(
         { success: false, error: 'No image file provided' },
         { status: 400 }
@@ -201,7 +211,6 @@ export async function POST(request: NextRequest) {
 
     // Validate file type
     if (!ALLOWED_TYPES.includes(file.type)) {
-      console.log("❌ [FILE] Invalid file type:", file.type)
       return NextResponse.json(
         { success: false, error: 'Invalid file type' },
         { status: 400 }
@@ -210,14 +219,12 @@ export async function POST(request: NextRequest) {
 
     // Validate file size
     if (file.size > MAX_FILE_SIZE) {
-      console.log("❌ [FILE] File too large:", file.size, "bytes")
       return NextResponse.json(
         { success: false, error: 'File too large' },
         { status: 400 }
       );
     }
 
-    console.log("✅ [FILE] File validation passed, processing image...")
     // Process image entirely in memory (no disk writes)
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -226,8 +233,6 @@ export async function POST(request: NextRequest) {
       .resize(2048, null, { withoutEnlargement: true })
       .jpeg({ quality: 85 })
       .toBuffer();
-    
-    console.log("✅ [IMAGE] Image processed successfully, size:", processedBuffer.length, "bytes")
 
     // Optional metadata from sender (Discord, etc.)
     const source = (formData.get('source') as string) || 'bot';
@@ -235,30 +240,22 @@ export async function POST(request: NextRequest) {
     const discordMessageId = (formData.get('discordMessageId') as string) || undefined;
     const discordChannelId = (formData.get('discordChannelId') as string) || undefined;
     const discordAuthorId = (formData.get('discordAuthorId') as string) || undefined;
-    
-    console.log("📋 [METADATA] Source:", source, "Caption:", caption?.substring(0, 50))
-    console.log("📋 [METADATA] Discord - Message:", discordMessageId, "Channel:", discordChannelId, "Author:", discordAuthorId)
 
     // Extract event from image using Gemini directly
-    console.log("🤖 [AI] Starting Gemini extraction...")
     const startTime = Date.now();
     let extractedData;
     
     try {
       extractedData = await geminiService.extractEventFromImage(processedBuffer, file.type);
-      console.log("✅ [AI] Gemini extraction successful")
-      console.log("🤖 [AI] Extracted data:", JSON.stringify(extractedData, null, 2))
-      console.log("🤖 [AI] Extracted title:", extractedData.title);
-      console.log("🤖 [AI] Extracted date:", extractedData.description);
     } catch (error) {
-      console.error('❌ [AI] Gemini extraction failed:', error);
+      const errorMessage = getErrorDetails(error);
+      console.error('❌ [AI] Gemini extraction failed:', errorMessage);
       return NextResponse.json({
         success: false,
-        error: 'Failed to extract event from image'
+        error: errorMessage
       }, { status: 500 });
     }
     const processingTime = Date.now() - startTime;
-    console.log("⏱️ [AI] Processing time:", processingTime, "ms")
     
     const extractResult: AIExtractionResult = {
       id: `extraction_${randomUUID()}`,
@@ -274,10 +271,7 @@ export async function POST(request: NextRequest) {
       completedAt: new Date()
     };
     
-    console.log('✅ [EXTRACT] Direct extraction completed:', extractResult.status, 'confidence:', extractResult.confidence);
-    
     if (extractResult.status === 'completed' && extractedData && extractedData.confidence >= 0.3 && userId !== 'discord-bot') {
-      console.log('📝 [EVENT] Creating event object from extracted data...')
       // Store the event in MongoDB for drafting
       const newEvent = {
         id: `event_${randomUUID()}`,
@@ -296,14 +290,6 @@ export async function POST(request: NextRequest) {
         updatedAt: new Date().toISOString()
       };
       
-      console.log('📝 [EVENT] Created event object:', JSON.stringify(newEvent, null, 2));
-      
-      // Store event data directly without ICS file generation
-      console.log('📅 [STORE] Preparing event data for MongoDB storage...');
-      
-      // Store the event in MongoDB
-      console.log('📝 [RECEIVER] Saving event to MongoDB');
-      
       try {
         await connectToDatabase();
         
@@ -313,18 +299,10 @@ export async function POST(request: NextRequest) {
           createdAt: new Date(),
           updatedAt: new Date()
         });
-        
-        console.log('✅ Event saved to MongoDB:', savedEvent._id);
-        
-        // Event saved to MongoDB successfully
-        
       } catch (dbError) {
         console.error('❌ MongoDB save failed:', dbError);
       }
-      
-      // Event stored in RECENT_EVENT array - accessible via /api/drafts endpoint
-      
-      console.log('✅ [SUCCESS] Returning successful response with event data')
+
       return NextResponse.json({
         success: true,
         message: 'Image processed and event draft created (no database persistence)',
@@ -332,8 +310,7 @@ export async function POST(request: NextRequest) {
         extractionResult: extractResult
       });
     } else if (extractResult.status === 'completed' && extractedData) {
-      console.log('⚠️ [VALIDATION] Event not saved - low confidence or discord-bot user');
-      console.log('⚠️ [VALIDATION] Confidence:', extractedData.confidence, 'UserId:', userId);
+      console.warn('⚠️ [VALIDATION] Event not saved - low confidence or discord-bot user');
       
       return NextResponse.json({
         success: true,
@@ -341,8 +318,8 @@ export async function POST(request: NextRequest) {
         extractionResult: extractResult
       });
     }
-    
-    console.log('⚠️ [WARNING] Extraction did not complete successfully, returning extraction result only')
+
+    console.warn('⚠️ [WARNING] Extraction did not complete successfully, returning extraction result only');
     return NextResponse.json({
       success: true,
       data: extractResult

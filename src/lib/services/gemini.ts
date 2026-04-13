@@ -6,6 +6,51 @@ import { ExtractedEvent } from '../../types';
 export class GeminiService {
   private model: any;
 
+  private getErrorDetails(error: unknown): string {
+    if (typeof error === 'string' && error.trim()) {
+      return error;
+    }
+
+    if (error && typeof error === 'object') {
+      const e = error as Record<string, unknown>;
+      const parts: string[] = [];
+
+      if (e.message && typeof e.message === 'string') {
+        parts.push(e.message);
+      }
+
+      if (e.status !== undefined) {
+        parts.push(`status=${String(e.status)}`);
+      }
+
+      if (e.statusText && typeof e.statusText === 'string') {
+        parts.push(`statusText=${e.statusText}`);
+      }
+
+      if (e.errorDetails !== undefined) {
+        try {
+          parts.push(`errorDetails=${JSON.stringify(e.errorDetails)}`);
+        } catch {
+          parts.push(`errorDetails=${String(e.errorDetails)}`);
+        }
+      }
+
+      if (parts.length > 0) {
+        return parts.join(' | ');
+      }
+    }
+
+    if (error instanceof Error && error.message) {
+      return error.message;
+    }
+
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return 'Unknown error';
+    }
+  }
+
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -13,7 +58,7 @@ export class GeminiService {
     }
     
     const genAI = new GoogleGenerativeAI(apiKey);
-    this.model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    this.model = genAI.getGenerativeModel({ model: process.env.MODEL_NAME || 'gemini-2.5-flash' });
   }
 
   async extractEventFromImage(imageBuffer: Buffer, mimeType: string): Promise<ExtractedEvent> {
@@ -87,8 +132,8 @@ Today is ${new Date().toDateString()}. Be sure the date you return is the closes
       };
 
     } catch (error) {
-      console.error('Gemini extraction error:', error);
-      throw new Error('Failed to extract event information from image');
+      const details = this.getErrorDetails(error);
+      throw new Error(details);
     }
   }
 
@@ -158,8 +203,8 @@ Text to analyze: ${text}
       };
 
     } catch (error) {
-      console.error('Gemini text extraction error:', error);
-      throw new Error('Failed to extract event information from text');
+      const details = this.getErrorDetails(error);
+      throw new Error(details);
     }
   }
 }
